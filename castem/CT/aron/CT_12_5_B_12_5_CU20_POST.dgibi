@@ -1,0 +1,890 @@
+***************************************************************************
+*   Calcul elastoplastique couplée (gurson) sur éprouvette CTJ            *
+*       (cf plan TMA.S 23-74) - Partie 3 : Post Traitement                *
+***************************************************************************
+
+*** NOM DE FICHIER A RESTITUER :
+OPTI 'REST' 'CT_12_5_B_12_5_IC20_CALC.sauv';
+REST ;
+OPTI ECHO 1;
+
+*** AFFICHAGE DES GRAPHES
+GRAFMAIL = 'N';
+GRAPH1 = 'N';
+GRAFDESS = 'N';
+
+***
+NBPAS = ((DIME TAB1.DEPLACEMENTS) - 1);
+*a=30.;
+LIST NBPAS;
+NBCARTO =  2;
+LTPS = PROG 1 PAS 1 NBPAS;
+
+*******************************
+********** PROCEDURE **********
+*******************************
+DEBPROC PROCARTO;
+   MMOD = ((NBPAS)/(ENTI NBCARTO));
+  OUICARTO =  @MOD (ENTI  &IND ) (ENTI MMOD) ;
+FINPROC OUICARTO;
+
+NCYCLRE = ENTI (43680/NPASCCH);
+
+***********************************************************
+********** ELEMENT UTILES POUR TOUT LE PROGRAMME **********
+***********************************************************
+NBPGAUSS = 8;
+
+*W = 25 ;
+*D1 = 0.0431 * W ;
+
+*CHFIX CHFIY CHFIZ = COOR (MAILA3D);
+*PTCMOD = POIN CHFIZ INFE ((0.8*B/2.) - 0.001);
+*TRAC ((ENVE MAILA3D COUL BLAN) ET (PTCMOD COUL ROUG));
+*CHFIX CHFIY CHFIZ = COOR PTCMOD;
+*PTCMOD = POIN CHFIY compris ((D1/2.)-(C/10.)) ((D1/2.)+(C/10.));
+*TRAC ((ENVE MAILA3D COUL BLAN) ET (PTCMOD COUL ROUG));
+*CHFIX CHFIY CHFIZ = COOR PTCMOD;
+*PTCMOD = POIN CHFIX compris (0 - 0.001) (0 + 0.001);
+*TRAC ((ENVE MAILA3D COUL BLAN) ET (PTCMOD COUL ROUG));
+
+
+*** LISTE CMOD, RMK :
+*- Mesurer le CMOD au point PTK
+*- Mesure plus proche de l'essai réel CTJ
+
+L_CMOD = PROG;
+L_CMOD_f_avant = PROG;
+REPE IND NBPAS;
+   CMOD= 2 * (EXTR TAB1.DEPLACEMENTS. &IND UY PTK) ;
+   L_CMOD = L_CMOD et (PROG CMOD);
+   CMOD_f_avant = 2 * (EXTR TAB1.DEPLACEMENTS. &IND UY PTD) ;
+   L_CMOD_f_avant = L_CMOD_f_avant ET (PROG CMOD_f_avant);
+FIN IND;
+
+list L_CMOD;
+list L_CMOD_f_avant;
+
+
+opti donn 5;
+*** ELFIS, RECUPERATION DE LA 1ERE COUCHE D'ELEMENT :
+*** PLAN DE PROPAGATION DE LA FISSURE
+
+CHFIX CHFIY CHFIZ = COOR (MAILF3D);
+PTFIS = POIN CHFIY INFE (0.001);
+*TRAC ((ENVE MAILTOT COUL BLEU) ET (PTFIS COUL ROUG));
+CHFIX CHFIY CHFIZ = COOR PTFIS;
+*PTFIS = POIN CHFIZ INFE ((B/2.) - 0.001);
+PTFIS = POIN CHFIZ INFE ((0.8*B/2.) - 0.001);
+*TRAC ((ENVE MAILTOT COUL BLEU) ET (PTFIS COUL ROUG));
+CHFIX CHFIY CHFIZ = COOR PTFIS;
+PTFIS  = POIN CHFIX SUPE (A + 0.001);
+PTFIS2 = POIN CHFIX COMPRIS (A + 0.001) (A + C - 0.001) ;
+PTFIS3 = POIN CHFIX COMPRIS (A + C + 0.001) (A + (2*C) - 0.001) ;
+PTFIS4 = POIN CHFIX COMPRIS (A + (2*C) + 0.001) (A + (3*C) - 0.001) ;
+PTFIS5 = POIN CHFIX COMPRIS (A + (3*C) + 0.001) (A + (4*C) - 0.001) ;
+PTFIS6 = POIN CHFIX COMPRIS (A + (4*C) + 0.001) (A + (5*C) - 0.001) ;
+*TRAC ((ENVE MAILTOT COUL BLEU) ET (PTFIS COUL ROUG) 
+*ET (PTFIS2 COUL VERT));
+ELFIS = MAILF3D ELEM APPUYE LARGEMENT PTFIS;
+*PTFIS = POIN CHFIX SUPE (A - (0.5*NGH*C) + 0.001);
+ELFIS2 = MAILF3D ELEM APPUYE LARGEMENT PTFIS;
+ELFIS3 = MAILF3D ELEM APPUYE LARGEMENT PTFIS2;
+ELFIS4 = MAILF3D ELEM APPUYE LARGEMENT PTFIS3;
+ELFIS5 = MAILF3D ELEM APPUYE LARGEMENT PTFIS4;
+ELFIS6 = MAILF3D ELEM APPUYE LARGEMENT PTFIS5;
+ELFIS7 = MAILF3D ELEM APPUYE LARGEMENT PTFIS6;
+*TRAC ((ENVE MAILTOT COUL BLEU) ET (PTFIS COUL ROUG)
+*ET (ELFIS COUL VERT) ET (ELFIS2 COUL BLANC));
+
+
+SI(NEG GRAFMAIL 'N');
+  TRAC cach ((ENVE MAILTOT COUL BLAN) ET (ELFIS COUL ROUG) et (ELFIS3 COUL VERT));
+FINSI;
+
+***********************************************************
+********** CREATION DU MODELE REDUIT ET CALCUL ************
+*************** DU VOLUME DES ELEMENTS ********************
+***********************************************************
+MODFIS = REDU MODTOT ELFIS;
+FONC1X = 'MANU' 'CHPO' ELFIS 1 'SCAL' 1.;        
+FONC1  = 'CHAN' 'CHAM' MODFIS FONC1X 'GRAVITE' 'SCALAIRE'; 
+
+MODFIS2 = REDU MODTOT ELFIS3;
+FONC2X  = 'MANU' 'CHPO' ELFIS3 1 'SCAL' 1.;        
+FONC2   = 'CHAN' 'CHAM' MODFIS2 FONC2X 'GRAVITE' 'SCALAIRE';  
+
+MODFIS3 = REDU MODTOT ELFIS4;
+FONC3X  = 'MANU' 'CHPO' ELFIS4 1 'SCAL' 1.;        
+FONC3   = 'CHAN' 'CHAM' MODFIS3 FONC3X 'GRAVITE' 'SCALAIRE';   
+
+MODFIS4 = REDU MODTOT ELFIS5;
+FONC4X  = 'MANU' 'CHPO' ELFIS5 1 'SCAL' 1.;        
+FONC4   = 'CHAN' 'CHAM' MODFIS4 FONC4X 'GRAVITE' 'SCALAIRE'; 
+
+MODFIS5 = REDU MODTOT ELFIS6;
+FONC5X  = 'MANU' 'CHPO' ELFIS6 1 'SCAL' 1.;        
+FONC5   = 'CHAN' 'CHAM' MODFIS5 FONC5X 'GRAVITE' 'SCALAIRE'; 
+
+MODFIS6 = REDU MODTOT ELFIS7;
+FONC6X  = 'MANU' 'CHPO' ELFIS7 1 'SCAL' 1.;        
+FONC6   = 'CHAN' 'CHAM' MODFIS6 FONC6X 'GRAVITE' 'SCALAIRE';
+
+*** V_P_FIS : VOLUME DE LA COUCHE D'ELEMENT DANS 
+*** LE PLAN DE LA FISSURE DE LA ZONE ENDOMMAGEABLE
+V_P_FIS = 'INTG' MODFIS FONC1;
+
+FVOLFIS  = ('INTG' 'ELEM' MODFIS FONC1)  ** (-1);
+FVOLFIS2 = ('INTG' 'ELEM' MODFIS2 FONC2) ** (-1);
+FVOLFIS3 = ('INTG' 'ELEM' MODFIS3 FONC3) ** (-1);
+FVOLFIS4 = ('INTG' 'ELEM' MODFIS4 FONC4) ** (-1);
+FVOLFIS5 = ('INTG' 'ELEM' MODFIS5 FONC5) ** (-1);
+FVOLFIS6 = ('INTG' 'ELEM' MODFIS6 FONC6) ** (-1);
+
+*** VOLUME D'UN ELEMENT DE LA FISSURE
+V_ELEM_F = (0.8*B/2/NVOL) *C *C ;
+*V_ELEM_F = (B/2/NVOL) * C * C;
+
+*** LONGUEUR DE LA FISSURE INITIALE
+A0 = A;
+
+*** LISTE DES TEMPS CORRESPONDENTS AU MAX DES PHASES DE CHARGEMENT
+L_T_CHAR = PROG;
+REPE IND NCYCLES;
+   L_T_CHAR = L_T_CHAR ET (PROG (2*&IND + 1));
+FIN IND;
+
+*** LIGNE CRITIRE
+L_CRIT = 0.90 * FF;
+
+
+*-----------------------------------------------------------
+*---------- Maillage avec avance de fissure ----------------
+*-----------------------------------------------------------
+
+mod2 = 'MODE' (MAILF3D) 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' 
+'PLASTIQUE_ENDOM' 'GURSON2';
+NBPG = 8;
+NELEM = NBEL MAILF3D;
+chMFISS = MANU 'CHAM' mod2 'POSI' GRAVITE scal 1 1 0.;
+NbPGcasT = 0;
+
+REPE ind NBPAS;
+   varin0 = tab1.variables_internes.&ind;
+   chcav = EXCO varin0 VHWF;
+REPE IND1 NELEM;
+   NPGCASSE = 0.;
+   REPE IND2 NBPG;
+     VAL1 = EXTR chcAV VHWF 1 (&IND1) (&IND2);     
+     coupure = 0.99;
+     SI (VAL1 > (coupure*ff));
+       NPGCASSE = NPGCASSE + 1;
+       NbPGcasT = NbPGcasT + 1;
+     FINSI;
+   FIN IND2;
+   chFISS1 = MANU 'CHAM' mod2 'POSI' GRAVITE
+             scal &IND1 1 NPGCASSE ;
+   chMFISS = chMFISS + chFISS1;
+FIN IND1;
+FIN ind;
+
+Npgcrit = 4;
+MAILREST = chMFISS ELEM 'EGINFE' (Npgcrit);
+modred2 = REDU mod2 MAILREST;
+
+
+*-----------------------------------------------------------
+*----------     FIGURE MAILLAGE ENDOMMAGE  -----------------
+*-----------------------------------------------------------
+REPE ind NBPAS;
+  SI (NEG GRAPH1 'N');
+  OCARTO = PROCARTO;
+     SI (OCARTO EGA 0);
+      NBPG = 8;                                   
+      NELEM = NBEL MAILF3D ; 
+      mod1a = 'MODE' (MAIL3D) 'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE'  
+          'ISOTROPE' ;
+      mod2a = 'MODE' (MAILF3D) 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE'  
+            'PLASTIQUE_ENDOM' 'GURSON2' ;
+      mod3a = 'MODE' ( GOU3D ) 'MECANIQUE' 'ELASTIQUE' ;
+      modtota = mod1a et mod2a et mod3a;
+      chMFISS = MANU 'CHAM' mod2a
+               'POSI' GRAVITE scal 1 1 0.;
+      chcav = tab1.VARIABLES_INTERNES.&ind;
+      chcav = REDU chcav MAILF3D  ; 
+      chcav = EXCO chcav VHWF;  
+      NbPGcasT = 0;                         
+      REPE IND1 NELEM;                    
+         NPGCASSE = 0.;               
+         REPE IND2 NBPG;                                    
+             VAL1 = EXTR chcAV VHWF 1 (&IND1) (&IND2);         
+                                              
+             coupure = 0.99;                            
+             SI (VAL1 > (coupure*ff));                          
+               NPGCASSE = NPGCASSE + 1;          
+               NbPGcasT = NbPGcasT + 1;                    
+             FINSI;                               
+             FIN IND2;                                      
+             chFISS1 = MANU 'CHAM' mod2a
+               'POSI' GRAVITE   scal &IND1 1 NPGCASSE ;
+             chMFISS = chMFISS + chFISS1;                               
+      FIN IND1;                                      
+*      Npgcrit = 4;                   
+*      MAILREST = chMFISS ELEM 'EGINFE' (Npgcrit);
+      DEP1 = TAB1.DEPLACEMENTS.(&ind);                
+      DEF1 = DEFO MAILF3D DEP1 1. ;
+*      trac chMFISS mod2a 'FACB' DEF1 (PROG 0 1 2 3 4) 'ANIME';
+*     opti donn 5;
+     FINSI;
+  FINSI;
+FIN ind;
+
+
+********************************
+********** DEFORMEE ************
+********************************
+REPE IND NBPAS;
+  DEP1 = TAB1.DEPLACEMENTS.(&IND);  
+  DEF0 = DEFO MAILRest DEP1 0. VERT;     
+  DEF1 = DEFO MAILrest DEP1 1. ROUG;    
+  DEF2 = DEFO MAILF3D DEP1 1. ROUG;
+  DEF3 = DEFO ELFIS2 DEP1 1. ROUG;
+  DEF4 = DEFO ELFIS DEP1 1. ROUG;
+  TITR 'DEFORMEE'  ET  &IND;    
+  OCARTO = PROCARTO;
+  SI (NEG GRAPH1 'N');
+     SI (OCARTO EGA 0);
+        TRAC CACH(DEF0 ET DEF1);
+        TRAC CACH DEF1;
+        TRAC DEF2;
+        TRAC DEF3;
+        TRAC DEF4;
+     FINSI;
+  FINSI;
+FIN IND;
+
+****************************************************
+********** FRACTION VOLUMIQUE DE CAVITE ************
+************** SUR MAILTOT ET ELFIS ****************
+****************************************************
+REPE IND NBPAS;
+   VARIN0 = TAB1.VARIABLES_INTERNES.&IND;
+   CHCAV  = EXCO VARIN0 VHWF;
+   OCARTO = PROCARTO;
+   SI(NEG GRAPH1 'N');
+     SI (OCARTO EGA 0);
+        TITRE 'Fv cavite au pas ' ET  &IND;
+        TRAC CHCAV MODTOT;
+        TRAC CHCAV MODFIS;
+     FINSI;
+   FINSI;
+FIN IND;
+
+*******************************************************************
+********** CALCUL ET TRACE DES FV PAR COUCHE D'ELEMENT ************
+*******************************************************************
+*** RMK :
+*- TELFIS est une table contenant 3/2*NHG entrée. Chaque entrée contient
+*  la liste des éléments dans la largeur (qui ont le meme X). Les listes
+*  sont triées par ordre de X croissant. Chaque entrée est donc la liste
+*  des éléments de ELFIS dans la largeur de l'éprouvette.
+
+TELFIS = TABLE;
+REPE IND (ENTI (1.5*NGH));
+   CHFIX CHFIY CHFIZ = COOR ELFIS;
+   PTFIS  = POIN CHFIX COMPRIS (A + (C * (&IND - 1)) - 0.001) 
+                               (A + (C * &IND) + 0.001);
+   ELTEMP = ELFIS ELEM APPUYE STRICTEMENT PTFIS;
+   TELFIS . &IND = ELTEMP;
+FIN IND;
+
+*** RMK :
+*- Liste de fraction volumique de cavite le long de la direction de 
+*  propagation, moyennée dans la largeur de l'éprouvette  en fonction
+*  du temps.
+*- TFCAV_M est une table de 3/2NGH entrée qui contient les listes de 
+*  fraction volumique en fonction du temps.
+*- LFCAV_T est une liste des FV en fonction du temps.
+*- E_FCAV est une liste de mot contenant plusieur evolution 
+*  (EVOL1 ET EVOL2 ET ... EVOLN) pour DESS boucle sur les éléments
+*  indice INDE ; et boucle sur le temps indice INDT.
+
+TFCAV_M = TABLE;
+REPE INDE (ENTI (1.5*NGH));
+   LFCAV_T = PROG;
+   REPETER INDT NBPAS;    
+       VARIN0 = TAB1.VARIABLES_INTERNES.&INDT;
+       CHCAV = EXCO VARIN0 VHWF;
+       CHCAV = REDU CHCAV (TELFIS . &INDE);
+*** VALEUR MOYENNE PAR ELEMENTS ET PAR TEMPS
+       MCAV    = (INTG MODFIS CHCAV) / V_P_FIS;
+       LFCAV_T = LFCAV_T ET (PROG MCAV);
+   FIN INDT;
+TFCAV_M . &INDE  =  LFCAV_T;
+FIN INDE;
+
+E_FCAV1 = EVOL MANU 'CMOD' L_CMOD 'LFCAV 1' TFCAV_M . 1  COUL ROUG; 
+E_FCAV2 = EVOL MANU 'CMOD' L_CMOD 'LFCAV 2' TFCAV_M . 2  COUL VERT;
+E_FCAV3 = EVOL MANU 'CMOD' L_CMOD 'LFCAV 3' TFCAV_M . 3  COUL BLEU;
+TABLEGE = TABLE;
+TABLEGE . 1 =  MOT 'Ligne elements  n° 1';
+TABLEGE . 2 =  MOT 'Migne elements  n° 2';
+TABLEGE . 3 =  MOT 'Ligne elements  n° 3';
+
+SI(NEG GRAPHDESS 'N');
+   DESS (E_FCAV1 ET E_FCAV2 ET E_FCAV3) 
+          LEGE TABLEGE TITR 'Fv_cav(CMOD)';
+FINSI;
+
+*******************************************************************
+********** LISTE DEFORMATION ET CONTRAINTE EQUIVALENTE ************
+****************** SUR FRONT DE FISSURE INITIAL *******************
+*******************************************************************
+LCONT = PROG;
+LEPSI = PROG;
+REPE IND NBPAS;
+*** CONTRAINTE EQUIVALENTE
+  VMIS0    = VMIS MODTOT TAB1.CONTRAINTES.&IND;
+  CHCONT   = REDU VMIS0 ((TELFIS . 1));
+  MODTFIS1 = REDU MODTOT (TELFIS . 1);
+  MCONT    = (INTG MODTFIS1 CHCONT);
+  LCONT    = LCONT ET (PROG MCONT);
+*** DEFORMATION EQUIVALENTE
+  VARIN0 = TAB1.VARIABLES_INTERNES.&IND;
+  CHEPSI = EXCO VARIN0 EPSE;
+  CHEPSI = REDU CHEPSI (TELFIS . 1);
+  MEPSI  = (INTG MODTFIS1 CHEPSI);
+  LEPSI  = LEPSI ET (PROG MEPSI);
+FIN IND;
+
+E_DEF  = EVOL MANU 'CMOD (mm)' L_CMOD 'Def Eq' LEPSI;
+E_CONT = EVOL MANU 'CMOD (mm)' L_CMOD 'Cont Eq' LCONT;
+
+SI (NEG GRAPHDESS 'N');
+   DESS E_DEF TITR 'Def_eq(CMOD) moyenne sur front de fissure';
+   DESS E_CONT TITR 'Cont_eq(CMOD) moyenne sur front de fissure';
+FINSI;
+
+********************************************************************
+******* CALCUL AVANCEE DE FISSURE DA2 BASEE SUR LA MOYENNE *********
+******* DES AVANCEES PAR LIGNE - STYLE METHODE DES 9 POINTS ********
+********************************************************************
+*** RMK :
+*- TELFIS2 est une table contenant B/C entrée, chaque entrée contient 
+*  la liste des éléments le long de la direction de propagation
+*  (meme Z). If the lateral grooves were to be added, then the parts
+*  B/2/NVOL should be further divivded by 0,8. 
+
+TELFIS2 = TABLE;
+REPE IND NVOL;
+   CHFIX CHFIY CHFIZ = COOR ELFIS;
+   LIST B;
+   LIST NVOL;
+   LIST ((0.8*B/2/NVOL) * (&IND - 1) - 0.001) ;
+   LIST ((0.8*B/2/NVOL) * (&IND    ) + 0.001) ;
+   ptfis = POIN chfiz compris 
+               ((0.8*B/2/NVOL) * (&IND - 1) - 0.001) 
+               ((0.8*B/2/NVOL) * (&IND    ) + 0.001);
+   eltemp = elfis ELEM APPUYE STRICTEMENT ptfis;
+*   trac cach ((eltemp coul roug) et (mailtot coul blan));
+   TELFIS2 . &IND = ELTEMP;
+FIN IND;
+
+*** RMK :
+*- L_DA2 est le critère à modifier après pour qu'il soit proche de FF.
+*- INDL est le nombre de ligne le long de la direction de propagation.
+*- INDE est le nombre d'élément par ligne.
+*- DA est l'avancée de la fissure pour une ligne pour un temps.
+*- DAM est l'avancée de la fissure pour un temps, moyenné sur les lignes
+
+CRIT = 0.90 * FF;
+
+L_DA_emouss = PROG;
+NPGCRITIC = 4;
+* boucle sur le temps
+REPE INDT NBPAS;
+  DA_emouss_moy = 0;
+* boucle dans l'épaisseur de l'éprouvette
+  REPE INDL NVOL;
+     A_emouss = 0;
+     nb_elem_casse = 0;
+     VARIN0 = TAB1.VARIABLES_INTERNES.&INDT;
+     CHCAV  = EXCO VARIN0 VHWF;
+     CHCAV  = REDU CHCAV (TELFIS2 . &INDL)  ;
+* boucle le long de la direction de propagation de fissure
+     n_elem_casse = 0;
+     REPE IND1 (NBEL (TELFIS2 . &INDL));
+         VCAVMOY = 0.;
+         n_p_gauss_casse_par_elem = 0;
+         REPE IND2 (NBPGAUSS);
+            VAL1    = EXTR CHCAV VHWF 1 (&IND1) (&IND2);
+            VCAVMOY = VCAVMOY + (VAL1 / NBPGAUSS);
+            SI (VAL1 >EG CRIT);
+               n_p_gauss_casse_par_elem = n_p_gauss_casse_par_elem + 1;
+            FINSI;
+         FIN IND2;
+         SI (n_p_gauss_casse_par_elem >EG NPGCRITIC);
+               n_elem_casse = n_elem_casse + 1;
+         FINSI;
+     FIN IND1;
+     n_elem_point_fiss = (NBEL TELFIS2 . &INDL ) - n_elem_casse;
+*     trac ((TELFIS2 . &INDL coul roug) et 
+*                 ((elem TELFIS2 . &INDL  n_elem_point_fiss) coul blan));
+     chfix chfiy chfiz= COOR (elem TELFIS2 . &INDL  n_elem_point_fiss) ;
+     pt_elem =  POIN chfix COMPRIS 
+                  (a + ((n_elem_casse)  * C) - 0.0001) 
+                  (a + ((n_elem_casse) * C) + 0.0001);  
+     chfix chfiy chfiz= COOR pt_elem ;
+     pt_elem =  POIN chfiy INFERIEUR 0.0001;
+     DA_emouss = (
+        (EXTR TAB1.DEPLACEMENTS.&INDT UX (pt_elem POIN 1)) + 
+          (EXTR TAB1.DEPLACEMENTS.&INDT UX (pt_elem POIN 2)) + 
+          (EXTR TAB1.DEPLACEMENTS.&INDT UX (pt_elem POIN 3))
+                         ) / 3.;
+    DA_emouss = DA_emouss - 
+             (EXTR TAB1.DEPLACEMENTS.&INDT UX PTK);
+  FIN INDL;
+  DA_emouss_moy = DA_emouss_moy + (DA_emouss / NVOL);
+  L_DA_emouss = L_DA_emouss ET (PROG DA_emouss_moy);
+FIN INDT;
+  E_DA3 = EVOL MANU 'CMOD' L_CMOD 'Delta a (mm)' L_DA_emouss;
+  DESS E_DA3 TITR 
+  'Delta a (mm) en fonction  de CMOD (mm)  9 pts avec emoussement';
+
+* liste qui contiendra l’avancé de fissure en fonction du temps
+*Lda2 = PROG;
+*REPE IND1 NBPAS; 
+* DEPFIN=TABDEP.&IND1; 
+* DD2 = 0;
+*REPE IND2 ;(NBNO ligne_fissure);
+** c’est fait en deux fois, DD1a position initiale et DD1b le déplacement, je ne sais pas si on peut directement avoir la **position sur le maillage déformée
+*    DD1a = COOR 1         (ligne_fissure POIN &IND2) ;
+*    DD1b = EXTR DEPFIN UX (ligne_fissure POIN &IND2);    
+*    DD1 = DD1a + DD1b;
+*    DD2 = DD2 + DD1;
+*  FIN IND2;
+*  DD2 = (DD2 / (NBNO ligne_fissure));
+*  lda2 = lda2 ET (prog DD2);
+*FIN IND1;
+
+
+
+
+opti donn 5;
+
+************************************
+************ F (CMOD) **************
+************************************
+L_F = PROG;
+REPE IND NBPAS;
+   REA1 = REDU (TAB1.REACTIONS.&IND) CHARGUY;
+   FOY  = MAXI (EXCO 'FY' (RESU REA1));
+   FOY  = FOY * 2.;
+   L_F  = L_F ET (PROG FOY);
+FIN IND;
+
+*** EVOLUTION DE F(CMOD)
+E_F = EVOL MANU 'CMOD (mm)' L_CMOD 'Force ' L_F ;
+SI(NEG GRAPHDESS 'N');
+  DESS E_F TITR 'F(CMOD)';
+FINSI;
+
+********************************************************************
+************ CALCUL DE J ELAST0-PLASTIQUE AVEC G-THETA *************
+********************************************************************
+NGH = 8;
+C   = 0.3;
+A   = W * 0.6;
+L   = (A + (NGH/2. * C));
+* RECUPERATION LEVRE SUP :
+MESS '**Debut levr_sup fiss.**';
+CHX CHY CHZ = COOR (MAILTOT);
+PBAS        = POIN CHY 'INFERIEUR' (0.00000001);
+*TRAC CACH ((MAILTOT COUL BLAN) ET (PBAS COUL VERT));
+chx chy chz = COOR (PBAS);
+*BORNE  = ((0.6 * (W/2.)) + 0.00001);
+*BORNE2 = ((L - (NGH * C)) - 0.0000001);
+*PTFISH = POIN A 0. HAUT;
+*BORNE2 = PTFISH;
+*LEV_SUP = POIN CHX 'COMPRIS' BORNE BORNE2;
+*LEV_SUP = POIN CHX 'COMPRIS' (A-1.1) (A-0.001);
+LEV_SUP = POIN CHX INFE A;
+TRAC CACH ((MAILTOT COUL BLAN) ET (LEV_SUP COUL VERT));
+CHX CHY CHZ = COOR (LEV_SUP);
+LEV_SUP     = POIN CHZ 'COMPRIS' 0.000001 (HAUT - 0.00001);
+LEV_SUP1    = ELEM (ENVE MAILTOT) APPUI LARGEMENT LEV_SUP;
+TRAC CACH ((MAILTOT COUL BLAN) ET (LEV_SUP1 COUL VERT) 
+                          ET (FR_FIS COUL ROUG));
+*LEV_SUP2    = (LEV_SUP1 ET S2);
+*TRAC CACH ((MAILTOT COUL BLAN) ET (LEV_SUP2 COUL VERT));
+ELIM LEV_SUP1 0.00001;
+
+
+TABJPL                            = TABLE;
+TABJPL . 'SOLUTION_PASAPAS'       = TAB1; 
+TABJPL . 'OBJECTIF'               = MOT 'J';
+TABJPL . 'LEVRE_SUPERIEURE'       = LEV_SUP1;
+TABJPL . 'FRONT_FISSURE'          = FR_FIS; 
+*TABJPL . 'MODELE'                 = MODTOT;
+*TABJPL . 'CARACTERISTIQUES'       = MATTOT;
+*TABJPL . 'BLOCAGES_MECANIQUES'    = CLTOT;
+*TABJPL . 'CHARGEMENT'             = CHA0;
+TABJPL . 'COUCHE'                 = 10;
+
+
+*THETA1 = 'MANU' 'CHPO'  FR_FIS 'UX' 2. 'UY' 0. 'UZ' 0.;
+*MONVEC = vect THETA1 vert; 
+*Trac monvec cach mailtot;
+*TABJPL. 'CHAMP_THETA'             = THETA1;
+
+G_THETA TABJPL;
+
+
+* verifier le volume utilise pou rl integration G_THETA
+ind1K = inde (TABJPL.CHAMP_THET1);
+teta1 = TABJPL.CHAMP_THET1.(ind1K . (dime ind1k));
+vtheta1 = vect teta1 'BLEU' ;
+trac vtheta1 (MAILTOT coul blan);
+trac teta1 (MAILTOT coul blan);
+trac teta1 MAILF3D;
+
+
+L_J = PROG;
+REPE IND NBPAS;
+   JPLRS = TABJPL . RESULTATS . &IND . GLOBAL;
+   L_J   = L_J ET (PROG JPLRS);
+FIN IND;
+
+*** EVOLUTION DE J(TEMPS)
+E_J = EVOL MANU 'CMOD' L_CMOD 'J' L_J;
+SI(NEG GRAPHDESS 'N');
+  DESS E_J TITR 'J(CMOD)';
+FINSI;
+
+**************************************
+************ COURBE JDA  *************
+**************************************
+E_JDA = EVOL MANU 'Da (mm)' L_DA2 'J' L_J;
+SI(NEG GRAPHDESS 'N');
+  DESS E_JDA TITR 'J(da)';
+FINSI;
+
+*****************************************************
+************ CALCUL DE J SELON LA NORME *************
+************** ISO 2016 **************
+*****************************************************
+L_COMP  = PROG;
+LU      = PROG;
+LUE     = PROG;
+LUP     = PROG;
+LF1     = PROG;
+LF2     = PROG;
+LCMOD1  = PROG;
+LCMOD2  = PROG;
+L_LIST1 = PROG;
+L_LIST2 = PROG;
+L_LIST1 = L_LIST1 ET (PROG (1));
+L_LIST2 = L_LIST2 ET (PROG (2));
+
+REPE IND ((NBPAS/2) - 1);    
+   L_LIST1 = L_LIST1 ET (PROG ( (EXTR L_LIST1 (&IND)) + 2 )); 
+   L_LIST2 = L_LIST2 ET (PROG ( (EXTR L_LIST2 (&IND)) + 2 ));
+FIN IND;
+
+LIST L_LIST1;
+LIST L_LIST2;
+
+REPE IND (NBPAS/2);
+   K = ENTI (EXTR L_LIST1 &IND);
+   LIST K;
+   LF1    = LF1 ET (PROG (EXTR L_F K));
+   LCMOD1 = LCMOD1 ET (PROG (EXTR L_CMOD K));
+   K      = ENTI((EXTR L_LIST2 &IND));
+   LIST K;
+   LF2    = LF2 ET (PROG (EXTR L_F K));
+   LCMOD2 = LCMOD2 ET (PROG (EXTR L_CMOD K));
+FIN IND;
+
+L_COMPOLD = ((LCMOD2 - LCMOD1) / (LF2 - LF1));
+list L_COMPOLD;
+
+*** Rotation correction for CT specimens
+H1 = 0.3 * W;
+*Rc = ((W+a0)/2.);
+Rc = 0.64 * W;
+D1 = 0.0431 * W;
+LLDis = LCMOD2;
+*AA = ((LLDis/2.)+(0.0431*W));
+*** RMK: Perhaps here I do not have to divide by 2 as the LCMOD2 is already half of displ, we have 1/4 model
+AA = (LLDis+(0.0431*W));
+Theta1 = ASIN(AA/((((D1)**2)+(Rc)**2)**0.5));
+Theta2 = atg(D1/Rc);
+Theta3 = Theta1 - Theta2;
+LCOMP1 = (H1/Rc);
+LCOMP2 = SIN(Theta3);
+LCOMP3 = LCOMP1 * LCOMP2;
+LCOMP4 = COS(Theta3);
+LCOMP5 = LCOMP3-LCOMP4;
+LCOMP6 = (D1/Rc);
+LCOMP7 = LCOMP6 * LCOMP2;
+LCOMP8 = LCOMP7 - LCOMP4;
+LCOMP9 = LCOMP5 * LCOMP8;
+*LCOMP1 = ((((0.3*25)/Rc)*sin(Theta3))-cos(Theta3));
+*L_COMP = L_COMPOLD/((((H1/Rc)*sin(Theta3))-cos(Theta3))*(((D1/Rc)*sin(Theta3))-cos(Theta3)));
+L_COMP = L_COMPOLD / LCOMP9;
+list L_COMP;
+
+*** CALCUL DE UP 
+E_F1 = EVOL MANU 'CMOD (mm)' LCMOD1 'Force ' LF1 ;
+SI(NEG GRAPHDESS 'N');
+  DESS E_F1 TITR 'F(CMOD)';
+FINSI;
+
+REPE IND (NBPas/2);
+*   IU = INTG E_F1 'ABS' 0 (&IND);
+   IU = INTG E_F1 'ABS' 1 (&IND);
+   LU = LU ET IU; 
+FIN IND;
+
+LUE = (((LF1*LF1)*(EXTR L_COMP (1)))/2);
+LUP = LU - LUE;
+LIST LU;
+LIST LUE;
+LIST LUP;
+
+*---------- Calcul de ldanorm
+lambda = 1;
+Youn02= (Youn0)/(1 - ((poisson)**2));
+BN = 0.8 * B;
+Be = B - (((B - BN)**2)/B) ;
+
+*REPE bouc1 100;
+
+*mu0 = 1/(((Be * lambda * Youn02 * (EXTR l_comp (1)))**0.5) + 1);
+mu0 = 1/(((Be * lambda * Youn0 * (EXTR l_comp (1)))**0.5) + 1);
+anorm0 = W*(1.000196 - (4.06319*mu0) + (11.242*(mu0**2))
+    - (106.043*(mu0**3)) + (464.335*(mu0**4)) - (650.677*(mu0**5)));
+
+g6_1 = ((W+a0)/(W-a0))**2;
+g6_1 = g6_1 * ( 2.163 + (12.219 * (a0/W)) 
+      - (20.065 * ((a0/W)**2)) - (0.9925 *((a0/W)**3)) 
+      + (20.609 *((a0/W)**4)) - (9.9314 * ((a0/W)**5)));
+
+g6_2 = ((W+anorm0)/(W-anorm0))**2;
+g6_2 = g6_2 * ( 2.163 + (12.219 * (anorm0/W)) 
+      - (20.065 * ((anorm0/W)**2)) - (0.9925 *((anorm0/W)**3)) 
+      + (20.609 *((anorm0/W)**4)) - (9.9314 * ((anorm0/W)**5)));
+
+
+lambda = g6_1 / g6_2;
+list lambda;
+list anorm0;
+
+
+*si ((0.9 < lambda) ET (lambda < 1.1));
+*quitter bouc1;
+
+*finsi;
+
+*fin bouc1;
+ 
+h = (Be * lambda * Youn0 * l_comp) ** 0.5;
+*h = (Be * lambda * Youn02 * l_comp) ** 0.5;
+*h = (Be * Youn02 * l_comp) ** 0.5;
+l_mu = 1/((H)+ 1);
+lanorm = W*(1.000196 - (4.06319*l_mu) + (11.242*(l_mu**2))
+    - (106.043*(l_mu**3)) + (464.335*(l_mu**4)) - (650.677*(l_mu**5)));
+
+*
+
+g_2 = (2 + (a0/W));
+g_2 = g_2 * (0.886 + (4.64*a0/W) - (13.32*((a0/W)**2)) + 
+(14.72*((a0/W)**3)) - (5.6*((a0/W)**4)));
+g_2 = g_2 / ((1 - (a0/W))**(3/2));
+*
+l_eta_p = 2 + (0.522*(1 - (lanorm / W)));
+*
+list lanorm;
+
+* Calcul de J selon norme
+ldanorm = lanorm - a0;
+list ldanorm;
+L_Jnor1 = PROG;
+*REPE IND (l_list);
+REPE IND (NBPas/2);
+*REPE IND (NcyclRe);
+     L_Jnor1 = L_Jnor1 ET
+               (PROG (((EXTR l_F (2*&IND))* g_2) / ((B*BN*W)**0.5))**2);
+*     la0 = la0 et (PROG (a0));
+FIN IND;
+L_Jnor1 = (L_Jnor1) * (1/(Youn02)) ; 
+L_Jnor2 = (l_eta_p * lUp)/(BN * (W-a0));
+L_Jnor2 = L_Jnor2 * (1 - 
+((((0.75 * l_eta_p) - 1) * ldanorm )/(W - a0)));
+
+L_Jnorm = L_Jnor1 + L_Jnor2 ;
+
+* Evolution de J fonction de da
+e_Jnorm = EVOL manu 'da (mm)' ldanorm 'J ' l_Jnorm ;
+SI(NEG GRAPHDESS 'N');
+  dess e_Jnorm TITR 'J(da) NF EN ISO 12135';
+FINSI;
+
+* Evolution de compl en fonction de CMOD
+ev_compl = EVOL manu 'CMOD (mm)' lCMOD2 'comp' l_comp ;
+dess ev_compl;
+
+
+*********************************************
+************ FILM CONTRAINTE YY *************
+*********************************************
+ISOSIG2 = PROG -1000 PAS 50 1000;
+REPE IND NBPAS; 
+   U2T = TAB1. DEPLACEMENTS . &IND;
+   SIG2T = EXCO 'SMYY' (TAB1 . CONTRAINTES . &IND);
+   SI(NEG GRAPH1 'N');
+      TRAC SIG2T MODTOT ISOSIG2 'TITR' 
+	      (CHAI 'Film contrainte YY au Pas =' &IND) 'NCLK';
+      XPAUSE = 0.;
+      REPE BPAUSE 1000;
+         XPAUSE = XPAUSE + 1.;
+      FIN BPAUSE;
+   FINSI;
+FIN IND;
+
+**************************************
+************ CONTRAINTES *************
+**************************************
+ISOSIG2 = PROG -400 PAS 50 400;
+REPE IND NBPAS;
+   OCARTO = PROCARTO;
+   SI(NEG GRAPH1 'N');
+      SI (OCARTO EGA 0);
+        TITRE 'Contraintes au pas' &IND;
+        TRAC TAB1.CONTRAINTES.&IND MODTOT ISOSIG2;
+      FINSI;
+   FINSI;
+FIN IND;
+
+******************************************************
+************ TRIAXIALITE DES CONTRAINTES *************
+******************************************************
+*ISOTRI2 = PROG -1 PAS 0.4 2.;
+*REPE IND NBPAS;
+*   VMIS1   = VMIS MODTOT TAB1.CONTRAINTES.&IND;
+*   VMIS11 = (CHAN TYPE VMIS1 SCALAIRE) + 0.0000001;
+*   CHEL1 CHEL2 CHEL3 = INVA MODTOT TAB1.CONTRAINTES.&IND;
+*   TRIAX = 0.333 * CHEL1 * (VMIS11 ** -1.);
+*   TRIAX2 = ('INTG' 'ELEM' MODFIS TRIAX) * FVOLFIS;
+*   TRIAX3 = ('INTG' 'ELEM' MODFIS2 TRIAX) * FVOLFIS2;
+*   TRIAX4 = ('INTG' 'ELEM' MODFIS3 TRIAX) * FVOLFIS3;
+*   TRIAX5 = ('INTG' 'ELEM' MODFIS4 TRIAX) * FVOLFIS4;
+*   TRIAX6 = ('INTG' 'ELEM' MODFIS5 TRIAX) * FVOLFIS5;
+*   TRIAX7 = ('INTG' 'ELEM' MODFIS6 TRIAX) * FVOLFIS6;
+*   OCARTO = PROCARTO;
+*   SI(NEG GRAPH1 'N');
+*      SI (OCARTO EGA 0);
+*         TITRE 'TRIAXIALITE' ET  &ind;
+*         TRAC TRIAX MODTOT ISOTRI2;
+*         TITRE 'TRIAXIALITE levre sup' ET  &IND;
+*         TRAC TRIAX2 MODFIS ISOTRI2;
+*         TITRE 'TRIAXIALITE front de fissure' ET  &IND;
+*         TRac TRIAX3 MODFIS2 ISOTRI2;
+*         TITRE 'TRIAXIALITE après front de fissure' ET  &IND;
+*         TRac TRIAX4 MODFIS3 ISOTRI2;
+*         TITRE 'TRIAXIALITE après 2 front de fissure' ET  &IND;
+*         TRac TRIAX5 MODFIS4 ISOTRI2;
+*         TITRE 'TRIAXIALITE après 3 front de fissure' ET  &IND;
+*         TRac TRIAX6 MODFIS5 ISOTRI2;
+*         TITRE 'TRIAXIALITE après 4 front de fissure' ET  &IND;
+*         TRac TRIAX7 MODFIS6 ISOTRI2;
+*      FINSI;
+*   FINSI;
+*FIN IND;
+*ELEMENT = PROG;
+*L_TRIAX = PROG;
+*REPE IND (NVOL);
+*   ELEMENT = ELEMENT ET (PROG (&IND));
+*   L_TRIAX = L_TRIAX ET (PROG (EXTR TRIAX3 'SCAL' 1 &IND 1));
+*FIN IND;
+*TRIAX = EVOL MANU 'N° de lElement' ELEMENT 'Triaxialité' L_TRIAX;
+
+*-------------------------------------------------
+*-----   TRIAXIALITE DES CONTRAINTES--------------
+*-------------------------------------------------
+chfix chfiy chfiz = coor (mailF3D);
+trfrfi = POIN chfiy INFE (0.001);
+trac cach ((mailtot coul blan) et (trfrfi coul roug));
+chfix chfiy chfiz = coor trfrfi;
+trfrfi = POIN chfiz INFE ((0.8*B/2.) - 0.001);
+*trfrfi = POIN chfiz INFE ((B/2.) - 0.001);
+trac cach ((mailtot coul blan) et (trfrfi coul roug));
+chfix chfiy chfiz = coor trfrfi;
+frf = EXTR l_da2 (NBPAS);
+trfrfi = poin chfix compris (A + frf + c - 0.001) 
+(A + frf + (2*c) + 0.001) ;
+*TRAC cach ((MAILF3D coul blanc) ET (trfrfi coul roug));
+trac cach ((mailtot coul blan) et (trfrfi coul roug));
+elfrfi = mailF3D ELEM APPUYE largement trfrfi;
+TRAC cach ((MAILtot coul blanc) ET (elfrfi coul roug));
+mfrfis = REDU modtot elfrfi;
+FNCfrX = 'MANU' 'CHPO' elfrfi 1  'SCAL' 1.;        
+FNCfr = 'CHAN' 'CHAM' modfis FNCfrX 'GRAVITE' 'SCALAIRE' ; 
+FvfrFis = ('INTG' 'ELEM' mfrfis FNCfr) ** (-1);
+
+
+isotri2 = prog -1 PAS 0.4 2.;
+
+REPE ind NBPAS;
+*REPE ind (2*NcyclRe);
+   VMIS1   = VMIS modtot tab1.contraintes.&ind;
+   vmis11 = (CHAN TYPE vmis1 SCALAIRE) + 0.0000001;
+   chel1 chel2 chel3 = INVA modtot tab1.contraintes.&ind;
+   triax = 0.333 * chel1 * (vmis11 ** -1.);
+   TRIAfr = ('INTG' 'ELEM' mfrfis triax) * FvfrFis;
+   OCARTO = PROCARTO;
+   SI(NEG GRAPH1 'N');
+   SI (OCARTO EGA 0);
+      TITRE 'TRIAXIALITE' ET  &ind;
+      TRAC triax modtot isotri2;
+      TITRE 'TRIAXIALITE levre sup' ET  &ind;
+      TRAC triafr mfrfis isotri2;
+   FINSI;
+   FINSI;
+FIN ind;
+
+
+Element = prog;
+l_triax = prog;
+
+REPE IND (Nvol);
+   Element = Element et (prog (&IND));
+   l_triax = l_triax et (prog (EXTR triafr 'SCAL' 1 &IND 1));
+Fin ind;
+triax = EVOL MANU 'N° de lElement' Element 'Triaxialité' l_triax;
+
+***************************************************
+************  DEFORMATION EQUIVALENTE *************
+***************************************************
+ISODEF2 = PROG 0. PAS 0.01 0.5;
+REPETER IND NBPAS;
+   VARIN0 = TAB1.VARIABLES_INTERNES.&IND;
+   OCARTO = PROCARTO;
+   SI(NEG GRAPH1 'N');
+      SI (OCARTO EGA 0);
+         TITRE 'Deformation equivalente modtot au pas' &IND;
+         TRAC VARIN0 MODTOT ISODEF2;
+      FINSI;
+   FINSI;
+FIN IND;
+
+
+*******************************************
+************  TABLE ET SORTIE *************
+*******************************************
+T_EVOL = E_FCAV1 ET E_FCAV2 ET E_FCAV3  ET E_F 
+ET E_DEF ET E_CONT ET E_DA2 ET E_F1 ET E_JNORM 
+ET TRIAX ET EV_COMPL et E_J et E_JDA;
+OPTI SORT 'Res_CT_12_5_B_12_5_CU20_CALC.csv';
+SORT EXCE T_EVOL;
+

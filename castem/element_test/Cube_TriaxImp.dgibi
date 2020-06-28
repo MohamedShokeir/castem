@@ -1,0 +1,122 @@
+*****************************************************
+* Paramètres
+*****************************************************
+* Déformation axiale appliquée
+EXX = 1.0;
+* sigma_yy = sigma_zz = alp*sigma_xx
+ALP = 0.5;
+* Nombre de pas
+NPAS = 10;
+*****************************************************
+* Maillage et Modèles
+*****************************************************
+
+OPTI DIME 3 ELEM CU20;
+OPTI MODE TRID;
+OPTI EPSI UTILISATEUR;
+
+*************************************
+**  GEOMETRIE  **
+*************************************
+
+P1 = 0. 0. 0.;
+P2 = 1. 0. 0.;
+L1 = P1 DROIT P2 1;
+S1 = L1 'TRANSLATION' (0. 1. 0.) 1;
+V1 = S1 'VOLUME' 'TRANSLATION' (0. 0. 1.) 1;
+
+FSX1 = V1 POINT PLAN (1. 0. 0.) (1. 1. 0.)
+(1. 0. 1.) 1.e-6;
+FSY1 = V1 POINT PLAN (0. 1. 0.) (1. 1. 0.)
+(0. 1. 1.) 1.e-6;
+FSZ1 = V1 POINT PLAN (0. 0. 1.) (1. 0. 1.)
+(0. 1. 1.) 1.e-6;
+FSX0 = V1 POINT PLAN (0. 0. 0.) (0. 1. 0.)
+(0. 0. 1.) 1.e-6;
+FSY0 = V1 POINT PLAN (0. 0. 0.) (1. 0. 0.)
+(0. 0. 1.) 1.e-6;
+FSZ0 = V1 POINT PLAN (0. 0. 0.) (1. 0. 0.)
+(0. 1. 0.) 1.e-6;
+
+*****************************************************
+
+coel = 'MOTS' 'YOUN' 'NU' 'RHO' 'ALPH' 'R0';
+
+statev = 'MOTS' 'EEXX' 'EEYY' 'EEZZ' 'EEXY' 'EEXZ' 'EEYZ' 'P';
+
+MOD1 = 'MODELISER' V1 'MECANIQUE' 'ELASTIQUE' 'NON_LINEAIRE'
+'UTILISATEUR' 'EPSILON' 'UTILISATEUR'
+'LIB_LOI' 'src/libUmatBehaviour.so'
+'FCT_LOI' 'umatmises' 'C_MATERIAU' coel 'C_VARINTER' statev;
+
+MAT1 = 'MATERIAU' MOD1 'YOUN' 2.e5 'NU' 0.3 'RHO' 0 'ALPH' 0
+'R0' 200.;
+
+*****************************************************
+* Conditions pseudo-périodiques + Chargement selon EXX
+*****************************************************
+
+RELY = RELA ENSE FSY1 UY;
+CLY = BLOQ FSY0 UY;
+RELZ  = RELA ENSE FSZ1 UZ;
+CLZ = BLOQ FSZ0 UZ;
+CLX = BLOQ FSX0 UX;
+CLEXX = BLOQ FSX1 UX;
+DEPX = DEPI CLEXX (EXX);
+
+PXP = V1 POIN PROC (1. 0. 0.);
+PYP = V1 POIN PROC (0. 1. 0.);
+PZP = V1 POIN PROC (0. 0. 1.);
+
+CLV = CLX ET CLY ET CLZ ET CLEXX;
+REL =  RELY ET RELZ;
+
+*****************************************************
+* Triaxialité imposé (chargement axisymétrique)
+*****************************************************
+
+OPTI ELEM SEG2;
+P7B = 0. 0. (2.*1.0);
+BAR1 = PZP DROI P7B 1;
+P1B = 0. (2.*1.0) 0.;
+BAR2 = PYP DROI P1B 1;
+
+BART = BAR1 ET BAR2;
+
+ELIM (BART ET V1) 0.000001;
+
+MOD2 = MODE BART 'MECANIQUE' 'ELASTIQUE' 'BARR';
+MAT2 = MATE MOD2 'YOUN' 2.e11 'NU' 0.;
+CAR2 = CARA MOD2 'SECT' 1.;
+
+CLB1 = RELA 1. UX PZP - 1. UX P7B;
+CLB2 = RELA 1. UY PZP - 1. UY P7B;
+CLB3 = RELA 1. UX PYP - 1. UX P1B;
+CLB4 = RELA 1. UZ PYP - 1. UZ P1B;
+
+CLB = CLB1 ET CLB2 ET CLB3 ET CLB4;
+
+trac cach (v1 et bart);
+
+*****************************************************
+* Calcul
+*****************************************************
+
+LT1 = PROG 0. PAS (1./NPAS) 1.;
+EV1 = EVOL MANU LT1 LT1;
+CHA1 = CHAR DIMP DEPX EV1;
+
+TAB1 = TABLE;
+TAB1.'MODELE' = MOD1 ET MOD2;
+TAB1.'CARACTERISTIQUES' = MAT1 ET MAT2 ET CAR2;
+TAB1.'CHARGEMENT' = CHA1;
+TAB1.'BLOCAGES_MECANIQUES' = CLV ET REL ET CLB;
+TAB1.'TEMPS_CALCULES' = LT1;
+TAB1.'GRANDS_DEPLACEMENTS' = VRAI;
+TAB1.'PROCEDURE_CHARMECA' = VRAI;
+TAB1.'COMPTEUR' = 0;
+TAB1.'ALPHA' = ALP;
+TAB1.'LAGRANGIEN' = MOT REACTUALISE;
+PASAPAS TAB1;
+
+

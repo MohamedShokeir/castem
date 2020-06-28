@@ -1,0 +1,468 @@
+ *************************************************************************** 
+ *   Calcul elastoplastique couplée (gurson) sur éprouvette CTJ            * 
+ *           (cf plan TMA.S 23-74) - Partie 1 : Maillage                   * 
+ *************************************************************************** 
+   
+ ******************** 
+ ******************** 
+ **** PARAMETRES **** 
+ ******************** 
+ ******************** 
+   
+ *** RMK : 
+ * En sachant que N1 et N2 sont les nombres d éléments tels que : 
+ *   - le maillage autour de la fissure soit un rectangle 4Ngh * Ngh2 
+ *   - le début de la fissure soit placé à N1 élémdepents de l angle en 
+ *     bas à gauche de ce rectangle. 
+ * ngh doit etre pair 
+   
+ GRAPH = 'O'; 
+   
+ * EPAISSEUR DE L'EPROUVETTE CT 
+ B = 12.5; 
+   
+ * MAILLAGE AUTOUR DE LA FISSURE 
+ NGH   = 8 ; 
+ NGH2  = 10 ; 
+ C     = 0.3 ; 
+   
+ * NOMBRE DE COUCHES LORS DE L'EXTRUSION (hors zone des rainures lattérales) 
+ NVOL = 3; 
+   
+ * NOMBRE DE COUCHES DANS LES ENTAILLES LATTERALES 
+ NENT = 4; 
+   
+ * STANDARIZED CONFIGURATION FOR CT 
+ W  = 25.; 
+ A  = W * 0.6 ; 
+ W1 = W * 1.25; 
+ D  = W * 0.0862; 
+ H1 = W * 0.3; 
+ H2 = W * 0.6; 
+ H  = W * 0.3; 
+ R  = W * 0.125; 
+   
+ ********************* 
+ ********************* 
+ **** MAILLAGE 2D **** 
+ ********************* 
+ ********************* 
+   
+ * OPTIONS GENERALES ET TYPE D'ELEMENTS GEOMETRIQUES 
+ OPTION DONN 3 ELEM QUA8 DIME 2 MODE PLAN DEFO ECHO 1 ; 
+ OPTI EPSI QUADRATIQUE; 
+   
+ * CREATION DES POINTS GEOMETRIQUES 
+ L     = (A + (NGH/2. * C)); 
+ XV    = ((((L - (NGH * C)) - H) / 2) + H); 
+   
+ PTA   = W 0.; 
+ PTB   = W H2; 
+ PTC   = (W - W1) H2; 
+ PTC1  = (W - W1) H1; 
+ PTD   = (W - W1) (D/2.); 
+ PTE   = (H - ((D/2.) / ((SIN(30)) / (COS(30))))) (D/2.); 
+ PTF   = H 0.; 
+ PTG   = L 0.; 
+ PTH   = (L - (NGH * C)) 0.; 
+ PTI   = L H2; 
+ PTJ   = 0. H2; 
+ PTK   = 0. (D/2); 
+ PTL   = (L + (NGH * C)) 0.; 
+ PTM   = (L + (L - XV)) 0.; 
+ PTN   = (L - ((COS(45)) * (L - XV))) ((COS(45)) * (L - XV)); 
+ PTP   = L (L - XV); 
+ PTQ   = (L + ((COS(45)) * (L - XV))) ((COS(45)) * (L - XV)); 
+ PTR   = (L - (NGH * C)) (NGH2 * C); 
+ PTS   = L (NGH2 * C); 
+ PTT   = (L + (NGH * C)) (NGH2 * C); 
+ PTU   = (H - ((D/2.) / ((SIN(30)) / (COS(30))))) H2; 
+ PTV   = XV 0; 
+ PTFIS = A 0; 
+   
+ * POINT DE CHARGEMENT 
+ PTZ = 0. H1; 
+   
+ * POINTS APPARTENANT AU CERCLE DE CHARGEMENT 
+ PTZ1   = 0. (H1 + R); 
+ PTZ2   = 0. (H1 - R); 
+ PTZ12  = (0 - R) H1; 
+ PTZ112 = (0 - (R * (COS(45)))) (H1 + (R * (COS(45)))); 
+ PTZ211 = (R * (COS(45))) (H1 + (R * (COS(45)))); 
+ PTZ21  = R H1; 
+   
+ ********************************************** 
+ **** DEFINITIONS DES SEGMENTS ET SURFACES **** 
+ ********************************************** 
+   
+ *** RMK : 
+ *  - Valeurs représentant le nombre d'éléments par segments. 
+ *  - Si le nombre d'éléments est négatif c'est que les densités d'éléments 
+ *    ne sont pas les memes aux deux extrémités. 
+   
+ * COTE GAUCHE EPROUVETTE 
+ NJK = 4; 
+   
+ * ENTRE CARRE GURSON ET CERCLE 
+ NFH = -4; 
+   
+ * HAUT/BAS GAUCHE DE LA PARTIE GAUCHE DE L'EPR. 
+ NDK   = 4; 
+ NCINT = ENTIER ((NGH2/2) + NDK); 
+   
+ * DENSITE APRES CECLE DANS LA PARTIE DROITE DE L'EPR. 
+ NAM = 4; 
+   
+ * DENSITES 
+ U1 = 1; 
+ U2 = 2; 
+ U3 = 2; 
+ U4 = 2; 
+   
+ * SURFACE S1 : GAUCHE DE LA GOUPILLE 
+ LCJ  = DROI NDK PTC PTJ; 
+ LDK  = DROI NDK PTD PTK; 
+ *LCD = DROI NDK PTC PTD; 
+ LCC1 = DROI (NDK/2) PTC PTC1 ; 
+ LC1D = DROI (NDK/2) PTC1 PTD ; 
+ LCD  = LCC1 ET LC1D ; 
+ LJZ1 = DROI NJK PTJ PTZ1; 
+ LKZ2 = DROI NJK PTK PTZ2; 
+ LJK  = (INVE LCJ) ET LCD ET LDK; 
+ C1A1 = CERC NDK PTZ1 PTZ PTZ112; 
+ C1A2 = CERC (NDK/2) PTZ112 PTZ PTZ12; 
+ C1B  = CERC (NDK+(NDK/2)) PTZ12 PTZ PTZ2; 
+ C1   = C1A1 ET C1A2 ET C1B; 
+ S1 = LJK LKZ2 (INVE C1) (INVE LJZ1) DALL PLAN; 
+ *TRAC S1; 
+   
+ * SURFACE S2 : (S2 et S3 deviendra MAILFIS) 
+ LGS   = DROI NGH2 PTG PTS; 
+ LRS   = DROI NGH PTR PTS; 
+ LHR   = DROI NGH2 PTH PTR; 
+ LGFIS = DROI (NGH/2) PTG PTFIS; 
+ LFISH = DROI (NGH/2) PTFIS PTH; 
+ LGH   = LGFIS ET LFISH; 
+ S2    = LGS (INVE LRS) (INVE LHR) (INVE LGH) DALL PLAN COUL ROUGE; 
+ *TRAC (S1 ET S2); 
+   
+ * SURFACE S3 : (S2 et S3 deviendra MAILFIS) 
+ LLT = DROI NGH2 PTL PTT; 
+ LST = DROI NGH PTS PTT; 
+ LGL = DROI NGH PTG PTL; 
+ S3 = LLT (INVE LST) (INVE LGS) LGL DALL PLAN COUL ROUGE; 
+ *TRAC (S1 ET S2 ET S3); 
+   
+ * SURFACE S4 : 
+ LNR = DROI NFH PTN PTR DINI U2 DFIN U1; 
+ LVH = DROI NFH PTV PTH DINI U2 DFIN U1; 
+ CVN = CERC NGH2 PTV PTG PTN; 
+ S4  = LHR (INVE LNR) (INVE CVN) LVH DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4); 
+   
+ * SURFACE S5 : 
+ LPS = DROI NFH PTP PTS DINI U2 DFIN U1; 
+ CNP = CERC NGH PTN PTG PTP; 
+ S5 = (INVE LPS) (INVE CNP) LNR LRS DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4 ET S5); 
+   
+ * SURFACE S6 : 
+ LQT = DROI NFH PTQ PTT DINI U2 DFIN U1; 
+ CPQ = CERC NGH PTP PTG PTQ; 
+ S6  = (INVE LQT) (INVE CPQ) LPS LST DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4 ET S5 ET S6); 
+   
+ * SURFACE S7 : 
+ LLM = DROI NFH PTL PTM DINI U1 DFIN U2; 
+ CMQ = CERC NGH2 PTM PTG PTQ; 
+ S7  = CMQ LQT (INVE LLT) LLM DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4 ET S5 ET S6 ET S7); 
+   
+ * SURFACE S8 : 
+ LAB = DROI NGH2 PTA PTB; 
+ LBQ = DROI (0-NAM) PTB PTQ DINI U3 DFIN U1; 
+ LAM = DROI NAM PTA PTM; 
+ S8 = LAB LBQ (INVE CMQ) (INVE LAM) DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4 ET S5 ET S6 ET S7 ET S8); 
+   
+ * SURFACE S9 : 
+ LBI = DROI NGH PTB PTI; 
+ LIP = DROI (0-NAM) PTI PTP DINI U4 DFIN U1; 
+ S9 = LBI LIP CPQ (INVE LBQ) DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4 ET S5 ET S6 ET S7 ET S8 ET S9); 
+   
+ * SURFACE S10 : 
+ LIU = DROI NGH PTI PTU; 
+ LNU = DROI (0-NAM) PTN PTU DINI U1 DFIN U3; 
+ S10 = LIU (INVE LNU) CNP (INVE LIP) DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4 ET S5 ET S6 ET S7 ET S8 ET S9 ET S10); 
+   
+ * SURFACE S11 : 
+ LEU = DROI NGH2 PTE PTU; 
+ LEF = DROI (NAM/2) PTE PTF; 
+ LFV = DROI (NAM/2) PTF PTV; 
+ LEV = LEF ET LFV; 
+ S11 = CVN LNU (INVE LEU) LEV DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4 ET S5 ET S6 ET S7 ET S8 ET S9 ET S10 ET S11); 
+   
+ * SURFACE S12 : 
+ E1   = ENTIER (NGH2/2); 
+ E2   = NGH2 - E1; 
+ LJU  = DROI NDK PTJ PTU; 
+ LEK  = DROI NDK PTE PTK; 
+ LKJ  = (INVE LEK) ET (INVE LEU) ET (INVE LJU); 
+ C2B1 = CERC E2 PTZ21 PTZ PTZ211; 
+ C2B2 = CERC NDK PTZ211 PTZ PTZ1; 
+ C2A  = CERC (NDK+E1)  PTZ2 PTZ PTZ21; 
+ C2   = C2A ET C2B1 ET C2B2; 
+ S12  = LKJ LJZ1 (INVE C2) (INVE LKZ2) DALL PLAN; 
+ *TRAC (S1 ET S2 ET S3 ET S4 ET S5 ET S6 ET S7 ET 
+ *S8 ET S9 ET S10 ET S11 ET S12); 
+   
+ * SURFACE S13 : AXE PAR LEQUEL EST IMPOSE LE DEPLACEMENT 
+ GOU1 = COUTURE C2B2 PTZ COUL VERT; 
+ GOU2 = COUTURE C1A1 PTZ COUL VERT; 
+ GOU = GOU1 ET GOU2; 
+ SI  (EGA GRAPH 'O'); 
+    TITRE 'Goupille de la    ' 'CT'(W/2)'A='A'A/W='(A/W)'Lc='C; 
+    TRAC GOU; 
+ FINSI; 
+ STOT = S1 ET S4 ET S5 ET S6 ET 
+ S7 ET S8 ET S9 ET S10 ET S11 ET S12; 
+ *TRAC ((STOT COUL BLAN) ET (GOU COUL VERT)); 
+   
+ * MAILLAGE QUI ENTOURE LA FISSURE : 
+ MAILFIS = S2 ET S3; 
+ SI  (EGA GRAPH 'O'); 
+    TITRE 'MAILFIS'; 
+    TRAC MAILFIS; 
+ FINSI; 
+ TRAC ((STOT COUL BLAN) ET (GOU COUL VERT) ET (MAILFIS COUL ROUG)); 
+   
+ * MAILLAGE DE RESTE DE L'EPR. 
+ MAILA = S1 ET S12 ; 
+ MAILB = S4 ET S5 ET S6 ET S7 ET S8 ET S9 ET S10 ET S11; 
+ MAIL = MAILA ET MAILB; 
+ *TRAC MAIL; 
+ ECART = (C/3); 
+ ************************************************************** 
+ ************************************************************** 
+ ***************         MAILLAGE 3D        ******************* 
+ ************************************************************** 
+ ************************************************************** 
+   
+ * OPTIONS GENERALES ET TYPE D'ELEMENTS GEOMETRIQUES 
+ OPTI DIME 3 ELEM CU20; 
+   
+ *** RMK : 
+ * -B/10 est l'epaisseur de l'entaille. 
+   
+ HAUT  = ((B/2)-(0.1*(B))); 
+ VEC1  = 0 0 HAUT; 
+ VEC2  = 0 0 (0.1*(B)); 
+ PA    = ((B/10)*(sin (45./2.)) / (cos (45./2.))); 
+ VECPA = 0 PA 0; 
+   
+ *** VOLUME MAILA3D : EPR. COTE GOUPILLE SANS LA GOUPILLE 
+ MAILA3D = MAILA VOLU (NVOL) 'TRAN' (VEC1); 
+ MAILA3D = MAILA3D VOLU (NENT) 'TRAN' (VEC2) ; 
+ TRAC CACH MAILA3D; 
+   
+ *** VOLUME MAIL3D1 : EPR. COTE FISS. SANS CARRE DE FISS.; MAIL3D = MAIL3D1 + MAILA3D 
+ MAILB3D = MAILB VOLU NVOL 'TRAN' VEC1; 
+ TRAC CACH MAILB3D; 
+   
+ * OBTENTION DES FACES 
+ F1B F3B F4B = FACE MAILB3D; 
+ F1A F3A F4A = FACE MAILA3D; 
+   
+ *on translate selon vec2 la surface du haut nommé F3B 
+ F3B = F3B PLUS VEC2; 
+   
+ LEU1 = LEU PLUS (VEC2 PLUS VEC1); 
+ LEF1 = LEF PLUS (VEC2 PLUS VEC1); 
+ PTF1 = PTF PLUS (VEC2 PLUS VEC1); 
+ PTE1 = PTE PLUS (VEC2 PLUS VEC1); 
+ D3 = POINT F3A DROITE (LEU1 POINT FINAL) (LEU1 POINT INITIAL) (ECART); 
+   
+ F3B  = F3B PLUS VECPA; 
+ LEU1 = LEU1 PLUS VECPA; 
+ LEF1 = LEF1 PLUS VECPA; 
+ PTF1 = PTF1 PLUS VECPA; 
+ PTE2 = PTE1 PLUS VECPA; 
+   
+ K    = (1 - (PA/(0.6 * W))); 
+ F31  = F3B AFFI K VECPA (0 1 0); 
+ LEF1 = LEF1 AFFI K VECPA (0 1 0); 
+ LEU1 = LEU1 AFFI K VECPA (0 1 0); 
+   
+ *on nomme la ligne que l'on bougera ensuite 
+ D1 = POINT F31 DROITE PTF1 PTE2 (ECART); 
+ D2 = POINT F31 DROITE (LEU1 POINT INITIAL) (LEU1 POINT FINAL) (ECART); 
+   
+ K2   = ((MESU (DROITE 1  PTE1 PTF1))/(MESU (DROITE 1  PTF1 PTE2))); 
+ ALP1 = (ATG (('ABS' ((COOR PTF1 (2)) - (COOR PTE2 (2)))) / 
+                  ('ABS' ((COOR PTF1 (1)) - (COOR PTE2 (1)))))) 
+        - (ATG (('ABS' ((COOR PTF1 (2)) - (COOR PTE1 (2)))) / 
+                  ('ABS' ((COOR PTF1 (1)) - (COOR PTE1 (1)))))); 
+ LIST ALP1; 
+   
+ DEPL D1 'TOUR' (ALP1) PTF1 (PTF1 PLUS VEC1) ; 
+ DEPL D1 AFFI (K2) PTF1 PTE1 ; 
+   
+ D2 = ORDO D2; 
+ D3 = ORDO D3; 
+   
+ N1 = (NBNOE LEU1) ; 
+ LD21 = PROG; 
+ LD31 = PROG; 
+ LD22 = PROG; 
+ LD32 = PROG; 
+ REPE IND N1; 
+     LD22 = LD22 ET (PROG (COOR 2 (D2 POIN (&IND)))); 
+     LD32 = LD32 ET (PROG (COOR 2 (D3 POIN ((N1 + 1) - &IND)))); 
+     LD21 = LD21 ET (PROG (COOR 1 (D2 POIN (&IND)))); 
+     LD31 = LD31 ET (PROG (COOR 1 (D3 POIN ((N1 + 1) - &IND)))); 
+ FIN IND; 
+   
+ DIF1 =  (lD31) - (lD21); 
+ DIF2 =  (lD32) - (lD22); 
+ * DIF = différence en les point de LEU1 et LEU 
+ REPE IND N1; 
+      DEPL (POIN D2 &IND) PLUS ((EXTR DIF1 &IND) (EXTR DIF2 &IND) 0.); 
+ FIN IND; 
+ MAIL3D1 = MAILB3D VOLU NENT F31; 
+ MAIL3D  = MAIL3D1 ET MAILA3D ; 
+ TRAC CACH MAIL3D; 
+   
+ *** VOLUME GOU3D : GOUPILLE 3D 
+ GOU3D = GOU VOLU (NVOL) 'TRAN' (VEC1); 
+ GOU3D = GOU3D VOLU (NENT) 'TRAN' (VEC2); 
+ TRAC CACH GOU3D; 
+   
+ * VOLUME MAILF3D : CUBES AUTOUR DE LA FISS. 
+ PTHH   = POIN (L-(NGH*C)) 0. HAUT; 
+ PTFISH = POIN A 0. HAUT; 
+ PTGH   = POIN L 0. HAUT; 
+ PTLH   = POIN (L+(NGH*C)) 0. HAUT; 
+   
+ FR_FIS = DROI NVOL PTFIS PTFISH; 
+ FR_FIS = FR_FIS COUL VERT; 
+ LGGH   = DROI NVOL PTG PTGH; 
+ LHHH   = DROI NVOL PTH PTHH; 
+   
+ LGFIS  = DROI (NGH/2) PTG PTFIS; 
+ LFISH  = DROI (NGH/2) PTFIS PTH; 
+ LFISGH = DROI (NGH/2) PTFISH PTGH; 
+ LFISHH = DROI (NGH/2) PTFISH PTHH; 
+   
+ S2 = FR_FIS (INVE LFISHH) (INVE LHHH) (INVE LFISH) DALL PLAN COUL ROUG; 
+   
+ LLLH   = DROI NVOL PTL PTLH; 
+ LGHLH  = DROI NGH PTGH PTLH; 
+ LGL    = DROI NGH PTG PTL; 
+ LFISL  = LGFIS ET LGL; 
+ LFISLH = LFISGH ET LGHLH; 
+   
+ S3      = LLLH (INVE LFISLH) (INVE FR_FIS) LFISL DALL PLAN COUL ROUG; 
+ MAILFIS = S2 ET S3; 
+   
+ VEC3 = 0 (NGH2*C) 0; 
+ MAILF3D = (MAILFIS) VOLU NGH2 'TRAN' VEC3; 
+   
+ *obtention des faces 
+ CHX CHY CHZ = COOR (MAILF3D); 
+ F3F = POIN CHZ 'COMPRIS' (HAUT - 0.00001) (HAUT + 0.00001); 
+ F3F = ELEM (ENVE MAILF3D) APPUI STRICTEMENT F3F; 
+ *on translate 
+ F3F2 = F3F PLUS VEC2; 
+ F3F2 = F3F2 PLUS VECPA; 
+ K    = (1-(PA/A)); 
+ F32  = F3F2 AFFI K VECPA (0 1 0); 
+   
+ MAIL3D2 = F3F VOLU NENT F32; 
+ MAILF3D = MAIL3D2 ET MAILF3D; 
+ TRAC CACH MAILF3D; 
+   
+ * VOLUME MAILTOT: MAILLAGE TOTAL 
+ * ELIMINATION DES NOEUDS DOUBLES 
+ *ECARELIM = C/8.; 
+ ECARELIM = 0.0000001; 
+ MAIL3D   = ELIM MAIL3D ECARELIM; 
+ GOU3D    = ELIM GOU3D ECARELIM; 
+ MAILF3D  = ELIM MAILF3D ECARELIM; 
+ * FUSION APRES LES ELIM INDIVIDUELS 
+ MAILTOT = MAIL3D ET GOU3D ET MAILF3D; 
+ MAILTOT = ELIM MAILTOT ECARELIM; 
+ SI  (EGA GRAPH 'O'); 
+    TRAC CACH MAILTOT; 
+ FINSI; 
+   
+ ***************************************************** 
+ **** AUTRES MAILLAGES OUTILES POUR LE CHARGEMENT **** 
+ ****            ET LE POST-TRAITEMENT            **** 
+ ***************************************************** 
+   
+ * PLANS DE SYMETRIE : 
+ * CONDITIONS AUX LIMITES : CHARGEMENT 
+ PTZ2 = 0 H1 HAUT; 
+   
+ * EXTRACTION DES POINTS DE CHARGEMENT : 
+ CHARGUY = MAILTOT POINT 'DROIT' PTZ PTZ2 0.01; 
+ *TRAC CACH ((MAILTOT COUL BLAN) ET (CHARGUY COUL VERT)); 
+   
+ * LIEN : 
+ PTA2 = W 0 HAUT; 
+ LIEN = MAILTOT POINT 'PLAN' PTFIS PTA PTA2 0.01; 
+ *TRAC CACH ((MAILTOT COUL BLAN) ET (CHARGUY COUL VERT) ET 
+ *(LIEN COUL ROUG)); 
+   
+ I   = 0; 
+ GEO = PTFIS; 
+ REPETER BOUCLE (NBELE LIEN); 
+    I     = I + 1; 
+    PTLI  = LIEN POINT (I); 
+    XPTLI = COOR 1 PTLI; 
+    SI (XPTLI >EG A); 
+       GEO = GEO ET PTLI; 
+    FINSI; 
+ FIN BOUCLE; 
+   
+ LIEN = GEO; 
+ SI  (EGA GRAPH 'O'); 
+    TRAC CACH ((MAILTOT COUL BLAN) ET (CHARGUY COUL VERT) ET 
+    (GEO COUL ROUG)); 
+ FINSI; 
+   
+ * RECUPERATION LEVRE SUP : 
+ MESS '**Debut levr_sup fiss.**'; 
+ CHX CHY CHZ = COOR (MAILTOT); 
+ PBAS        = POIN CHY 'INFERIEUR' (0.00000001); 
+ *TRAC CACH ((MAILTOT COUL BLAN) ET (PBAS COUL VERT)); 
+ chx chy chz = COOR (PBAS); 
+ BORNE       = ((0.6 * (W/2.)) + 0.00001); 
+ BORNE2      = ((L - (NGH * C)) - 0.0000001); 
+ LEV_SUP     = POIN CHX 'COMPRIS' BORNE BORNE2; 
+ *TRAC CACH ((MAILTOT COUL BLAN) ET (LEV_SUP COUL VERT)); 
+ CHX CHY CHZ = COOR (LEV_SUP); 
+ LEV_SUP     = POIN CHZ 'COMPRIS' 0.000001 (HAUT - 0.00001); 
+ LEV_SUP1    = ELEM (ENVE MAILTOT) APPUI LARGEMENT LEV_SUP; 
+ *TRAC CACH ((MAILTOT COUL BLAN) ET (LEV_SUP1 COUL VERT)); 
+ LEV_SUP1    = (LEV_SUP1 ET S2); 
+ TRAC CACH ((MAILTOT COUL BLAN) ET (LEV_SUP1 COUL VERT)); 
+ ELIM lev_sup1 0.00001; 
+   
+ * SAUVEGARDE DES DONNEES ET FIN DU PROGRAMME : 
+ OPTI SAUV 'CT_12_5_B_12_5_CU20_MAIL.sauv'; 
+ SAUV; 
+   
+ * SORTIE MED DES MAILLAGES 
+ OPTI 'SORT' 'CT_12_5_B_12_5_CU20_MAIL.med'; 
+ SORT 'MED' MAILTOT; 
+   
+ * RELECTURE DES FICHIERS MED : VERIFICATION 
+ TAB1 = 'LIRE' 'MED' 'CT_12_5_B_12_5_CU20_MAIL.med'; 
+ 'LIST' TAB1; 
+ *FIN; 
+   
+ fin; 

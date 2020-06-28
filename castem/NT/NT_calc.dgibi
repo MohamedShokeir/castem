@@ -1,0 +1,380 @@
+*-----------------------*
+*   Paraview Procedure  *
+*-----------------------*
+
+'DEBPROC' SVTK TABNL*TABLE OBJMO*MMODEL FICH*MOT RMAIL/MAILLAGE;
+
+MAILL = 'EXTRAIRE' OBJMO 'MAIL';
+UN = 'MANUEL' CHML OBJMO SCAL 1. 'GRAVITE';
+FVOLU = (('INTG' 'ELEM' UN OBJMO)'**'(-1));
+
+I = 0;
+'REPETER' BO1 ('DIME' TABNL.DEPLACEMENTS);
+VM = VMIS TABNL.CONTRAINTES.I OBJMO;
+VM = 'NOMC' 'VMIS' VM;
+CHAT = ('REDU' OBJMO TABNL.CONTRAINTES.I) 'ET'
+ ('REDU' OBJMO TABNL.VARIABLES_INTERNES.I)
+  'ET' ('REDU' OBJMO VM);
+
+TABV = TABLE;
+LCOM = 'EXTRAIRE' CHAT 'COMP';
+
+'REPETER' BO2 ('DIME' LCOM);
+TMP1 = 'INTG' 'ELEM' OBJMO
+ CHAT ('EXTRAIRE' &BO2 LCOM);
+TMP2 = 'CHANGER' TMP1 OBJMO 'GRAVITE';
+TMP3 = 'NOMC' (TMP2*FVOLU) ('EXTRAIRE' &BO2 LCOM);
+TABV.('EXTRAIRE' &BO2 LCOM) = TMP3;
+'FIN' BO2;
+
+'OPTION' 'SORTIR' FICH;
+'SORTIR' VTK MAILL 'MAIL' (TABNL.DEPLACEMENTS.I) 'DEPL'
+ TABV 'FORM' 'AUTO' 'TEMP' I 'DOUBLE_PRECISION';
+
+'SI' ('EXISTE' RMAIL);
+GCHA1 = 'REDU' CHAT RMAIL;
+GCHA2 = 'REDU' (TABNL.DEPLACEMENTS.I) RMAIL;
+GMODL = 'REDU' OBJMO RMAIL; 
+
+G1 G2 G3 = GVTK GCHA1 GCHA2 GMODL;
+
+'OPTION' 'SORTIR' ('CHAINE' FICH '_POINTS_DE_GAUSS');
+'SORTIR' VTK G1 'GAUS' G2 'DEPL'
+ G3 'BINA' 'AUTO' 'TEMP' I 'DOUBLE_PRECISION';
+'FINSI';
+
+I = I '+' 1;
+
+'FIN' BO1;
+
+'FINPROC';
+
+'DEBPROC' GVTK CHAM0*MCHAML CHPO0*CHPOINT OBJMO*MMODEL;
+
+MAILL = 'EXTRAIRE' OBJMO 'MAIL';
+
+***************************************************
+
+CHA1 = 'CHANGER' CHAM ('COORDONNEE' 1 MAILL) OBJMO 'STRESSES';
+CHA1 = 'NOMC' 'X' CHA1;
+CHA2 = 'CHANGER' CHAM ('COORDONNEE' 2 MAILL) OBJMO 'STRESSES';
+CHA2 = 'NOMC' 'Z' CHA2;
+CHAP = CHA1 'ET' CHA2;
+
+CHAD = ('CHANGER' CHAM OBJMO CHPO0 'STRESSES');
+CHAD = 'EXCO' ('MOTS' 'UX' 'UZ') CHAD;
+
+CHAM1 = CHAP 'ET' CHAD 'ET' CHAM0;
+LCOM = 'EXTRAIRE' CHAM1 'COMP';
+
+TABR = TABLE;
+'REPETER' BO1 ('DIME' LCOM);
+TABR.&BO1 = 'PROG';
+'FIN' BO1;
+
+***************************************************
+
+MOZO = 'EXTRAIRE' OBJMO 'ZONE';
+
+'OPTION' ERREUR 'CONTROLE';
+J = 1;
+'REPETER' BO0 (('DIME' MOZO)/2);
+TMPMODEL = MOZO.J;
+TMPMAILL = MOZO.(J '+' 1);
+'REPETER' BO1 ('NBEL' TMPMAILL);
+CHAM2 = 'REDU' CHAM1 ('ELEM' &BO1 TMPMAILL);
+'REPETER' BO2 100;
+TEST = 'EXTRAIRE' CHAM2 ('EXTRAIRE' LCOM 1) 1 1 &BO2;
+'SI' (('EXISTE' TEST));
+'REPETER' BO3 ('DIME' LCOM);
+TMP1 = 'EXTRAIRE' CHAM2
+ ('EXTRAIRE' LCOM &BO3) 1 1 &BO2;
+TABR.&BO3 = (TABR.&BO3) 'ET' ('PROG' TMP1);
+'FIN' BO3;
+'SINON';
+'QUITTER' BO2;
+'FINSI';
+'FIN' BO2;
+'FIN' BO1;
+J = J '+' 2;
+'FIN' BO0;
+'OPTION' ERREUR 'NORMALE';
+
+'REPETER' BO1 ('DIME' (TABR.1));
+TMP1 = 'EXTRAIRE' &BO1 (TABR.1);
+TMP2 = 'EXTRAIRE' &BO1 (TABR.2);
+'SI' (&BO1 'EGA' 1);
+PTGAUSS = TMP1 TMP2;
+'SINON';
+PTGAUSS = PTGAUSS 'ET' (TMP1 TMP2);
+'FINSI';
+'FIN' BO1;
+
+DEPGAUSS = 'MANUEL' 'CHPO' PTGAUSS
+ 'UX' (TABR.3) 'UZ' (TABR.4);
+
+TABV = TABLE;
+'REPETER' BO1 (('DIME' LCOM) '-' 4);
+TMP1 = 'MANUEL' 'CHPO'  'NATU' 'DISCRET'
+ PTGAUSS ('EXTRAIRE' (&BO1 '+' 4) LCOM) (TABR.(&BO1+4));
+TABV.('EXTRAIRE' (&BO1 '+' 4) LCOM) = TMP1;
+'FIN' BO1;
+
+'FINPROC' PTGAUSS DEPGAUSS TABV;
+
+*-----------------------*
+*   Sample definition   *
+*-----------------------*
+
+* Mesh parameters :
+* elements:
+LINEAR=0;
+SI (LINEAR EGA 1) ;
+ELEM0 = 'LINEAIRE' ;
+ELEM1 = QUA4 ;
+ELEM2 = Q4RI ;  
+SINON ;
+ELEM0 = 'QUADRATIQUE' ;
+ELEM1 = QUA8 ;
+ELEM2 = Q8RI ;
+FINSI ;
+* NT10, NT4, or NT2 :
+R0=4;
+* real radius of the NT :
+R1=1.6;
+* radius in the cross section of the notch :
+PHI1  = 2. ;
+* radius in the cross section outisde the notch :
+PHI2  = 3.6 ;
+* length occupied by the notch :
+SI (R0 <EG 4.) ;
+L0    = R1 ;
+SINON ;
+L0    = ((R1 * R1) - (R1 - ((PHI2 - PHI1))**2.))**0.5 ;
+FINSI ;
+*
+SAMP0 = CHAI 'NT' R0;
+MED0  = '.med' ;
+SAUV0 = '.sauv' ;
+
+* Total deformation/deplacement :
+DEFMAX = 0.2 ;
+DEPMAX = L0 * DEFMAX ;
+
+*-----------------------*
+*  Material Parameters  *
+*-----------------------*
+* Material's behaviour :
+GTN=1;
+
+YOUN0 = 70000.;
+RHO0  = 2700. ;
+NU0   = 0.34 ;
+PHI   = 0;
+
+* GTN :
+F00   = 0.0043 ;
+*FC0   = 0.04 ;
+FR0   = 0.056 ;
+Q10   = 2. ;
+Q20   = 1. ;
+AN0   = 2.92 ;
+PS0   = 0.0321 ;
+FN0   = 0.0059 ;
+SIGS0 = 500. ;
+
+*-----------------------*
+*         Mesh          *
+*-----------------------*
+
+* Imported mesh from Salome (.med 3.2):
+TAB0 = LIRE 'MED' (CHAI SAMP0 MED0) ;
+
+MESH = CHAN ELEM0 (TAB0 . 'MESH');
+*TRAC MESH; 
+
+MTOT  = MESH ELEM ELEM1 ;
+
+* edges, nodes, and faces :
+LBAS  = CHAN ELEM0 (TAB0 . 'ligament_edge') ;
+LHAUT = CHAN ELEM0 (TAB0 . 'head_edge') ;
+*LEXT0 = CHAN ELEM0 (TAB0 . 'extenso_edge') ;
+NNECK = TAB0 . 'neck_node' ;
+NEXT0 = TAB0 . 'extenso_node' ;
+NHEAD = TAB0 . 'head_node' ;
+NCENT = TAB0 . 'center_node' ;
+PNECK = TAB0 . 'neck_node' POIN 'INITIAL';
+PEXT0 = TAB0 . 'extenso_node' POIN 'INITIAL' ;
+PHEAD = TAB0 . 'head_node' POIN 'INITIAL' ;
+PCENT = TAB0 . 'center_node' POIN 'INITIAL' ;
+LIGA0 = CHAN ELEM0 (TAB0 . 'ligament') ;
+EXT0  = CHAN ELEM0 (TAB0 . 'extenso') ;
+HEAD  = CHAN ELEM0 (TAB0 . 'head') ;
+
+ELIM ((MTOT) ET (LBAS ET LHAUT ET PNECK ET NNECK)) 10.E-6;
+ELIM ((LBAS) ET (MTOT)) 10.E-6;
+ELIM ((LHAUT) ET (MTOT)) 10.E-6;
+*TRAC (MTOT ET (LBAS COUL VERT) ET (LHAUT COUL ROUGE));
+*-----------------------*
+*        Model          *
+*-----------------------*
+
+OPTI DIME 2 ELEM ELEM1 MODE AXIS ;
+OPTI EPSI 'UTILISATEUR' ;
+
+SI (GTN EGA 0) ;
+
+COE1 = 'MOTS' 'YOUN' 'NU' 'RHO' 'PHI';
+STATEV = 'MOTS' 'EERR' 'EEZZ' 'EETT' 'EERZ' 'P';
+MOD0 = 'MODELISER' MTOT 'MECANIQUE' 'ELASTIQUE' 'NON_LINEAIRE'
+'UTILISATEUR' 'Q8RI' 
+ 'LIB_LOI' 'src/libUmatBehaviour.so' 
+'FCT_LOI' 'umatj47_malls'
+ 'C_MATERIAU' COE1 'C_VARINTER' STATEV ;
+MAT0 = 'MATERIAU' MOD0 'YOUN' YOUN0 'NU' 0.3 'RHO' 0 'PHI' PHI ;
+
+SINON ;
+
+COE1 = 'MOTS' 'YOUN' 'NU' 'RHO' 'PHI' ;
+STATEV = 'MOTS' 'EERR' 'EEZZ' 'EETT' 'EERZ' 'P' 'F' 
+'FG' 'BROK' ;
+MOD0 = 'MODELISER' MTOT 'MECANIQUE' 'ELASTIQUE' 'NON_LINEAIRE'
+'UTILISATEUR' ELEM2 
+ 'LIB_LOI' 'src/libUmatBehaviour.so' 
+'FCT_LOI' 'umatgursontvergaardneedleman1982perfectplasticity_malls'
+ 'C_MATERIAU' COE1 'C_VARINTER' STATEV ;
+MAT0 = 'MATERIAU' MOD0 'YOUN' YOUN0 'NU' 0.3 'RHO' 0 'PHI' PHI;
+
+FINSI ;
+
+*-----------------------*
+*  Boundary Conditions  *
+*-----------------------*
+
+CL1 = BLOQ UZ LBAS ;  
+CL2 = BLOQ UZ LHAUT ;
+
+CL = CL1 ET CL2 ;
+
+TFIN0 = 1. ;
+
+SI (GTN EGA 0);
+VAR0 = MANU CHML MOD0 'EERR' 0. 'EEZZ' 0. 'EETT' 0.
+'EERZ' 0. 'P' 0. ;
+*VAR0 = MANU CHML MOD0 'EPSE' 0. ;
+SINON ;
+VAR0 = MANU CHML MOD0 'EERR' 0. 'EEZZ' 0. 'EETT' 0. 
+'EERZ' 0. 'P' 0. 'F' F00 'FG' 0. 'BROK' 0. ;
+FINSI;
+
+DEP1 = 'DEPI' CL2 DEPMAX ; 
+EV0  = 'EVOL' 'MANU' TEMPS ( 'PROG' 0. TFIN0 ) Y ( 'PROG' 0. 1. ) ; 
+CHA0 = 'CHAR' 'DIMP' DEP1 EV0 ; 
+
+LTPC = (PROG 0. PAS 1.E-2 1.) ;
+LTPS = (PROG 0. PAS 1.E-2 1.) ;
+
+NBPAS = DIME (LTPS) - 1. ;
+
+*-----------------------*
+*       PERSO 1         *
+*-----------------------*
+DEBP PERSO1 TAB1*'TABLE' ;
+
+
+*****************************************
+
+MO1 = TAB1.WTABLE.'MO_TOT';
+MA1 = TAB1.WTABLE.'MA_TOT';
+MAIL1 = 'EXTRAIRE' MO1 'MAIL';
+
+TMP1 = 'EXCO' (TAB1.ESTIMATION.VARIABLES_INTERNES) 'BROK';
+TMP1 = 'CHANGER' GRAVITE MO1 TMP1 'STRESSES';
+TMP1 = TMP1 'MASQUE' 'EGSU' 0.5;
+
+TMP2 = 'EXCO' TAB1.ESTIMATION.CONTRAINTES SMZZ;
+TMP2 = 'CHANGER' GRAVITE MO1 TMP2 'STRESSES';
+TMP2 = TMP2 'MASQUE' INFE 1.;
+
+TMP3 = ('NOMC' TMP1 'SCAL') * ('NOMC' TMP2 'SCAL');
+
+MEBR = TMP3 'ELEM' SUPE 0.;
+MESO = 'DIFF' MAIL1 MEBR;
+NBRO = 'NBEL' MEBR;
+
+'SI' (('NBEL' MEBR) > 0);
+
+MO2 = 'REDU' MO1 MESO;
+TAB1.WTABLE.'MO_TOT' = MO2;
+TAB1.WTABLE.'MO_TOTAL' = MO2;
+TAB1.WTABLE.'MOD_MEC' = MO2;
+
+'FINSI';
+
+*****************************************
+
+
+
+FINP;
+
+*-----------------------*
+*      PAS A PAS        *
+*-----------------------*
+
+TAB1                       = TABLE;
+TAB1.'VARIABLES_INTERNES'  = TABLE ;
+TAB1.'MOVA'                = 'MOT' 'RIEN' ;
+TAB1.'BLOCAGES_MECANIQUES' = CL ;
+TAB1.'MODELE'              = MOD0 ;
+TAB1.'CARACTERISTIQUES'    = MAT0 ;
+TAB1.'CHARGEMENT'          = CHA0 ;
+TAB1.'TEMPS_CALCULES'      = LTPC ;
+*TAB1.'TEMPS_SAUVEGARDES'   = LTPS ; si pas_resu
+TAB1.'TEMPS_SAUVES'        = LTPS ;
+TAB1.VARIABLES_INTERNES.0  = VAR0 ;
+TAB1.'GRANDS_DEPLACEMENTS' = VRAI ;
+TAB1.'PAS_AJUSTE' = FAUX;
+TAB1.'DFMAX' = 1.e-4;
+TAB1.'FMAX_P' = 0.;
+TAB1.'FMAX_N' = 0.;
+*TAB1.'GRANDES_DEFORMATIONS' = VRAI;
+TAB1.'LAGRANGIEN'           = 'MOT' 'REACTUALISE';
+TAB1.'CONVERGENCE_FORCEE'   = VRAI ;
+*
+SI (GTN EGA 1) ;
+TAB1 .'PROCEDURE_PERSO1' = VRAI ;
+TAB1 .'LMCAV'            = PROG ;
+TAB1 .'LVARMCAV'         = PROG ;
+TAB1 .'TOTPTCAS'         = PROG ; 
+TAB1 .'TOTECAS'          = PROG ;
+FINSI ;
+* 
+*TMASAU                     = 'TABLE' ;
+*TAB1   . 'MES_SAUVEGARDES' = TMASAU ;
+*TMASAU .'DEFTO'            = VRAI ;
+*TMASAU .'DEFIN'            = VRAI ;  
+*
+TAB1 .'REDUCTION' =  FAUX ; 
+TAB1 .'DTMIN'     = 1.E-20 ; 
+*TAB1 .'DEMAX'     = 1.E-3 ; 
+TAB1 .'DDMAX'     = FR0/500. ;
+
+PASAPAS TAB1 ;
+
+SVTK TAB1 MOD0 SAMP0 MTOT;
+
+*-----------------------*
+*         Save          *
+*-----------------------*
+
+OPTI SAUV (CHAI SAMP0 SAUV0) ;
+
+SAUV TAB0 TAB1 DEPMAX MOD0 MAT0 LTPC LTPS
+CHA0 VAR0 CL NBPAS NNECK NEXT0 NHEAD NCENT
+PEXT0 PNECK PHEAD PCENT LBAS LHAUT LEXT0 
+LIGA0 EXT0 HEAD MTOT R0 R1 
+YOUN0 RHO0 NU0 PHI F00 FC0 FR0 
+Q1 Q2 AN0 PS0 FN0 SIGS0 
+R0 R1 PHI1 PHI2 L0;
+
+*OPTI DONN 5;

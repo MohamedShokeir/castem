@@ -1,0 +1,14 @@
+#  NT10, NT4, or NT2 :
+ 2 R0
+
+# real notch radius of the NT :
+ 0.8 R1
+
+# Damage :
+ 0 GTN
+
+# lineair or quadraitque :
+ 1 LINEAR
+
+# thermal fluence
+ 100 PHI0

@@ -1,0 +1,409 @@
+*OPTI 'ERRE' 'IGNORE' ;
+*-----------------------*
+*   Sample definition   *
+*-----------------------*
+
+GTN   = 0 ;
+SAMP0 = 'ST';
+PPS   = '.ps' ;
+SAUV0 = '.sauv' ;
+MESH0 = 'mesh_' ;
+
+*-----------------------*
+*      Restitution      *
+*-----------------------*
+
+OPTI REST (CHAI SAMP0 SAUV0) ;
+REST ;
+
+* List of time increments :
+*--------------------------
+
+NBPAS = (DIME (TAB1.TEMPS))- 1 ;
+TAILLE = ENTI (NBPAS) ;
+NBLBAS = NBNO LBAS ;
+
+* Mesh output :
+*--------------
+
+GRAPH  = 'O' ;
+FILE   = 'O' ;
+OPTI TRAC PSC ;
+OPTI FTRA (CHAI MESH0 SAMP0  PPS) ;
+
+*-----------------------*
+*    Vectors & Tables   *
+*-----------------------*
+
+* force vector :
+*---------------
+LFORCE = PROG ;
+LFORCE = INSE LFORCE 1 (0.) ;
+
+* stress vector (F/S0) :
+*-----------------------
+LFS0 = PROG ;
+LFS0 = INSE LFS0 1 (0.) ;
+
+* displacement vector :
+*----------------------
+LDT = PROG ;
+LDT = INSE LDT 1 (0.) ;
+
+* horizontal displacement vector :
+*---------------------------------
+CORB = COOR 1 PNECK ;
+LDD  = PROG ;
+LDD  = INSE LDD 1 (0.) ;
+
+* necking vector :
+*-----------------
+LSTRIC = PROG ;
+LSTRIC = INSE LSTRIC 1 (0.) ;
+
+* deformation vector (dL/L0) :
+*-----------------------------
+LEPS = PROG ;
+LEPS = INSE LEPS 1 (0.)   ;
+
+* VMIS vectors :
+*----------------
+* average in ligament :
+LSIG = PROG ;
+LSIG = INSE LSIG 1 (0.) ;
+* maximum in ligament :
+LSIGMAX = PROG ;
+LSIGMAX = INSE LSIGMAX 1 (0.) ;
+* minimum in ligament :
+LSIGMIN = PROG ;
+LSIGMIN = INSE LSIGMIN 1 (0.) ;
+
+* plastic deformation vectors :
+*------------------------------
+* average in ligament :
+LP = PROG ;
+LP = INSE LP 1 (0.) ;
+* maximum in ligament :
+LPMAX = PROG ;
+LPMAX = INSE LPMAX 1 (0.) ;
+* minimum in ligament :
+LPMIN = PROG ;
+LPMIN = INSE LPMIN 1 (0.) ;
+
+* stress triaxiality vectors :
+*-----------------------------
+* average in ligament :
+LTRI = PROG ;
+LTRI = INSE LTRI 1 (0.33) ;
+* maximum in ligament :
+LTRIMAX = PROG ;
+LTRIMAX = INSE LTRIMAX 1 (0.) ;
+* minimum in ligament :
+LTRIMIN = PROG ;
+LTRIMIN = INSE LTRIMIN 1 (0.) ;
+
+* porosity vectors :
+*-------------------
+* average in ligament :
+LF    = PROG ;
+LF    = INSE LF 1 F00 ;
+* maximum in ligament :
+LFMAX = PROG ;
+LFMAX = INSE LFMAX 1 F00 ;
+* minimum in ligament :
+LFMIN = PROG ;
+LFMIN = INSE LFMIN 1 F00 ;
+
+* stress evolution in the ligament :
+*-----------------------------------
+TASIG    = TABLE ;
+TASIGMAX = TABLE ;
+TASIGMIN = TABLE ;
+
+* plastic deformation evolution in the ligament :
+*------------------------------------------------
+TAP    = TABLE ;
+TAPMAX = TABLE ;
+TAPMIN = TABLE ;
+
+* stress triaxiality evolution in the ligament :
+*-----------------------------------------------
+TATRI    = TABLE ;
+TATRIMAX = TABLE ;
+TATRIMIN = TABLE ;
+
+* porosity evolution in the ligament :
+*-------------------------------------
+TAF    = TABLE ;
+TAFMAX = TABLE ;
+TAFMIN = TABLE ;
+
+*-----------------------*
+*        Ligament       *
+*-----------------------*
+
+ELFIS  = MTOT ELEM APPUYE LARGEMENT LBAS ;
+TRAC ((ENVELOPPE MTOT COUL BLEU) ET (ELFIS COUL ROUGE)) ;
+
+MODFIS = REDU MOD0 ELFIS ;
+FONC1X = 'MANU' 'CHPO' ELFIS 1  'SCAL' 1. ;                               
+FONC1  = 'CHAN' 'CHAM' MODFIS FONC1X 'GRAVITE' 'SCALAIRE' ;              
+DETR FONC1X ;
+
+VOL1   = 'INTG' MODFIS FONC1 ;
+FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
+
+*-------------------------*
+* Loop on time increments *
+*-------------------------*
+
+REPETER IND TAILLE ;
+
+* Resultant force and diametral contraction :
+*--------------------------------------------
+
+   EVF    = EVOL CHPO (TAB1.REACTIONS.&IND) (LHAUT) ;
+   F      = SOMM (EXTR EVF 'ORDO') ;
+   LFORCE = LFORCE ET (PROG F) ;
+   RPB    = CORB + (EXTR TAB1.DEPLACEMENTS.&IND UR PNECK) ;
+   EPSD   = (LOG ((3.1415*CORB*CORB)/(3.1415*RPB*RPB)))/2. ;
+   LDD    = LDD ET (PROG EPSD) ;
+
+* F/S0 and dL/L0 :
+*-----------------
+
+   SIG  = F / (3.14 * (PHI1) * (PHI1)) ;
+   LFS0 = LFS0 ET (PROG SIG) ;
+   LDT  = LDT ET (PROG (TAB1.TEMPS.&IND)) ;
+   LDP  = LDT * DEPMAX ;
+
+* VMIS  :
+*--------
+
+   VMIS1         = VMIS MOD0 TAB1.CONTRAINTES.&IND ;
+   VMIS2         = CHAN CHPO MOD0 VMIS1 ;
+   EVSIG         = EVOL CHPO VMIS2 LBAS ;
+   TASIG.&IND    = EXTR EVSIG 'ORDO' ;
+   TASIGMAX.&IND = MAXI TASIG.&IND ;
+   LSIGMAX       = LSIGMAX ET (PROG TASIGMAX.&IND) ;
+   TASIGMIN.&IND = MINI TASIG.&IND ;
+   LSIGMIN       = LSIGMIN ET (PROG TASIGMIN.&IND) ;
+   CHCONT        = REDU VMIS1 ELFIS ;   
+   MOYSIG        = (INTG MODFIS CHCONT) / VOL1 ;
+   LSIG          = LSIG ET (PROG MOYSIG) ;
+
+* plastic deformation :
+*----------------------
+
+   VARIN1      = TAB1.VARIABLES_INTERNES.&IND ;
+   DEFEQ1      = EXCO VARIN1 'P' ;
+   DEFEQ2      = CHAN CHPO MOD0 DEFEQ1 ;
+   EVEPS       = EVOL CHPO DEFEQ2 LBAS ;
+   TAP.&IND    = EXTR EVEPS 'ORDO' ;
+   TAPMAX.&IND = MAXI TAP.&IND ;
+   LPMAX       = LPMAX ET (PROG TAPMAX.&IND) ;
+   TAPMIN.&IND = MINI TAP.&IND ;
+   LPMIN       = LPMIN ET (PROG TAPMIN.&IND) ;
+   CHEPSI      = REDU DEFEQ1 ELFIS ;
+   MOYP        = (INTG MODFIS CHEPSI) / VOL1  ;
+   LP          = LP ET (PROG MOYP) ;
+
+* stress triaxiality :
+*---------------------
+   VMIS3             = CHAN TYPE VMIS1 SCALAIRE ;
+   CHEL1 CHEL2 CHEL3 = INVA MOD0 TAB1.CONTRAINTES.&IND ;
+*   TRI0              = (CHEL1 / 3.) * (VMIS3 ** -1.) ;
+   TRI0              = (CHEL1 / 3.) * ((VMIS3+1.E-10)** -1.) ;
+   TRI1              = CHAN 'NOEUD' MOD0 TRI0 ;
+   TRI2              = CHAN 'CHPO' MOD0 TRI1 ;
+   EVTRIAX           = EVOL CHPO TRI2 LBAS ;
+   TATRI.&IND        = EXTR EVTRIAX ORDO ;
+   TATRIMAX.&IND     = MAXI TATRI.&IND ;
+   LTRIMAX           = LTRIMAX ET (PROG TATRIMAX.&IND) ;
+   TATRIMIN.&IND     = MINI TATRI.&IND ;
+   LTRIMIN           = LTRIMIN ET (PROG TATRIMIN.&IND) ;
+   CHTRI             = REDU TRI1 ELFIS ;
+   MOYTRI            = (INTG MODFIS CHTRI) / VOL1 ;
+   LTRI              = LTRI ET (PROG MOYTRI) ;
+
+SI (GTN EGA 1) ;
+* porosity :
+*-----------
+
+   FCAV1       = EXCO TAB1.VARIABLES_INTERNES.&IND 'F' ;
+   FCAV2       = CHAN 'CHPO' MOD0 FCAV1 ;
+   EVCAV       = EVOL CHPO FCAV2 LBAS ;
+   TAF.&IND    = EXTR EVCAV ORDO ;
+   TAFMAX.&IND = MAXI (TAF.&IND) ;
+   LFMAX       = LFMAX ET (PROG TAFMAX.&IND) ;
+   TAFMIN.&IND = MINI (TAF.&IND) ;
+   LFMIN       = LFMIN ET (PROG TAFMIN.&IND) ;
+   CHCAV       = REDU FCAV1 ELFIS ;
+   MOYCAV      = (INTG MODFIS CHCAV) / VOL1 ;
+*   MAXCAV      = MAXI CHCAV ;
+*   LFMAX       = LFMAX ET (PROG MAXCAV) ;
+   LF          = LF ET (PROG MOYCAV) ;
+
+FINSI ;
+
+FIN IND ;
+
+*SI (GRAF EGA 1) ; 
+OPTI TRAC X           ;
+*DESS (EVOL MANU LDP LSIG);
+*DESS (EVOL MANU  LDP LCAV);
+*DESS (EVOL MANU  LDP LMAXCAV);
+OPTI TRAC PSC                   ;
+*FINSI;
+
+*-----------------------*
+*    Evolution tables   *
+*-----------------------*
+
+* dL/L0 vs. F/S0 :
+*-----------------
+LEPS   = (LDP / (L0 / 2.))/2. ;
+EVLONG = EVOL MANU 'dL/L0' LEPS 'F/S0' LFS0 ;
+
+* dD/D0 vs. F/S0 :
+*-----------------
+EVDIAM = EVOL MANU 'dD/D0' LDD 'F' LFORCE ;
+
+* dD/D0 vs. p :
+*--------------
+EVP    = EVOL MANU 'dD/D0' LDD 'p' LP ;
+EVPMAX = EVOL MANU 'dD/D0' LDD 'p_max' LPMAX ;
+EVPMIN = EVOL MANU 'dD/D0' LDD 'p_min' LPMIN ;
+
+* dD/D0 vs. VMIS :
+*-----------------
+EVSIG    = EVOL MANU 'dD/D0' LDD 'VMIS' LSIG ;
+EVSIGMAX = EVOL MANU 'dD/D0' LDD 'VMIS_max' LSIGMAX ;
+EVSIGMIN = EVOL MANU 'dD/D0' LDD 'VMIS_min' LSIGMIN ;
+
+* dD/D0 vs. triax :
+*------------------
+EVTRI    = EVOL MANU 'dD/D0' LDD 'TRIAX' LTRI ;
+EVTRIMAX = EVOL MANU 'dD/D0' LDD 'VMIS_max' LTRIMAX ;
+EVTRIMIN = EVOL MANU 'dD/D0' LDD 'VMIS_min' LTRIMIN ;
+
+SI (GTN EGA 1) ;
+
+* dD/D0 vs. f :
+*--------------
+EVF    = EVOL MANU 'dD/D0' LDD 'f' LF ;
+EVFMAX = EVOL MANU 'dD/D0' LDD 'f_max' LFMAX ;
+EVFMIN = EVOL MANU 'dD/D0' LDD 'f_min' LFMIN ;
+
+TAEVOL = EVLONG ET EVDIAM ET EVP ET EVSIG ET EVTRI ET EVF ;
+TAMAX  = EVPMAX ET EVSIGMAX ET EVTRIMAX ET EVFMAX ;
+TAMIN  = EVPMIN ET EVSIGMIN ET EVTRIMIN ET EVFMIN ;
+OPTI SORT (CHAI 'porosity_' SAMP0) ;
+SORT EXCE TAF SEPA ESPA ;
+
+SINON ;
+TAEVOL = EVLONG ET EVDIAM ET EVP ET EVSIG ET EVTRI ;
+TAMAX  = EVPMAX ET EVSIGMAX ET EVTRIMAX ;
+TAMIN  = EVPMIN ET EVSIGMIN ET EVTRIMIN ;
+FINSI ;
+
+OPTI SORT (CHAI SAMP0 '_evolution') ;
+SORT EXCE TAEVOL SEPA ESPA ;
+OPTI SORT (CHAI SAMP0 '_evolution_max') ;
+SORT EXCE TAMAX SEPA ESPA ;
+OPTI SORT (CHAI SAMP0 '_evolution_min') ;
+SORT EXCE TAMIN SEPA ESPA ;
+
+OPTI SORT (CHAI SAMP0 '_VM_stress') ;
+SORT EXCE TASIG SEPA ESPA ;
+
+OPTI SORT (CHAI SAMP0 '_plas_deformation') ;
+SORT EXCE TAP SEPA ESPA ;
+
+OPTI SORT (CHAI SAMP0 '_triaxiality') ;
+SORT EXCE TATRI SEPA ESPA ;
+
+*-----------------------*
+*    Field analyses     *
+*-----------------------*
+* DÉFORMÉE :
+
+DEPFIN = TAB1.DEPLACEMENTS.NBPAS ;
+VARIN1 = TAB1.VARIABLES_INTERNES.NBPAS ;
+DEF0   = DEFO MTOT DEPFIN 0. VERT     ;
+DEF1   = DEFO MTOT DEPFIN 1. ROUGE    ;
+EPS1   = EPSI MOD0 DEPFIN ;
+
+TRAC (DEF0 et DEF1) 'TITR' 'DEFORMED MESH' ;
+TRAC EPS1 MOD0 'TITR' 'DEFORMATION'                  ;
+TRAC TAB1.CONTRAINTES.NBPAS MOD0 'TITR' 'VMIS' ;
+*TRAC (EXCO TAB1.VARIABLES_INTERNES.NRUP 'F') MOD0 'TITR' 'Porosity';
+
+OPTI TRAC PSC ;
+OPTI FTRA (CHAI "p_" SAMP0  PPS) ;
+REPETER IND NBPAS ;
+P11   = EXCO TAB1.VARIABLES_INTERNES.(&IND) 'P' ;
+DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+TRAC LPMAX P11 MOD0 DEFO1 'TITR' 'Plastic deformation' ;
+FIN IND;
+
+OPTI TRAC PSC ;
+OPTI FTRA (CHAI "triaxiality_" SAMP0  PPS) ;
+REPETER IND NBPAS ;
+VMIS22      = CHAN TYPE (VMIS MOD0 
+TAB1.CONTRAINTES.(&IND)) SCALAIRE ;
+*VMIS33      = CHAN TYPE VMIS22 SCALAIRE ;
+CH1 CH2 CH3 = INVA MOD0 TAB1.CONTRAINTES.(&IND) ;
+*TRI00       = (CH1 / 3.) * (VMIS22 ** -1.) ;
+TRI00       = (CH1 / 3.) * ((VMIS22+1.E-10)** -1.) ;
+TRI11       = CHAN 'NOEUD' MOD0 TRI00 ;
+DEFO1       = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+TRAC TRI11 MOD0 DEFO1 'TITR' 'Stress triaxiality' ;
+FIN IND;
+
+OPTI TRAC PSC ;
+OPTI FTRA (CHAI "VMIS_" SAMP0  PPS) ;
+REPETER IND NBPAS ;
+VMIS00 = VMIS MOD0 TAB1.CONTRAINTES.(&IND) ;
+VMIS11 = CHAN 'GRAVITE' MOD0 VMIS00 ;
+DEFO1  = DEFO MTOT TAB1.DEPLACEMENTS.&IND;
+TRAC LSIGMAX VMIS11 MOD0 DEFO1 'TITR' 'VMIS' ;
+FIN IND;
+
+OPTI TRAC PSC ;
+OPTI FTRA (CHAI "TRIAX_END_" SAMP0  PPS) ;
+VMIS22      = CHAN TYPE (VMIS MOD0 
+TAB1.CONTRAINTES.NBPAS) SCALAIRE ;
+CH1 CH2 CH3 = INVA MOD0 TAB1.CONTRAINTES.NBPAS ;
+TRI00       = (CH1 / 3.) * ((VMIS22+1.E-10)** -1.) ;
+*TRI00       = (CH1 / 3.) * (VMIS22 ** -1.) ;
+TRI11       = CHAN 'CHPO' TRI00 MOD0 'SUPP';
+*TRI11       = CHAN 'NOEUD' MOD0 TRI00 ;
+TRI22       = EXTR TRI11 'MAIL';
+TRAC TRI11 TRI22 'TITR' 'Stress triaxiality' ;
+
+SIG      = SIGM DEPFIN  MOD0 MAT0 ;
+SIGZZ    = EXCO SIG 'SMZZ';
+MESS 'Mini et Maxi de Sigma ZZ : ' (MINI SIGZZ)  (MAXI SIGZZ) ;
+TRAC SIGZZ MOD0 'TITR''[5] Sig_ZZ dans le maillage' ;
+
+SIGZZG   = CHAN 'CHPO' SIGZZ MOD0 'SUPP';
+MPGAUSS  = EXTR SIGZZG 'MAIL';
+TRAC SIGZZG MPGAUSS 'TITR' '[5] Sig_ZZ aux points de Gauss' ;
+
+F77 = EXCO TAB1.VARIABLES_INTERNES.NBPAS 'P' ;
+F88 = CHAN 'CHPO' F77 MOD0 'SUPP';
+F99 = EXTR F88 'MAIL';
+TRAC F88 F99 'TITR' '[5] P aux points de Gauss' ;
+
+SI (GTN EGA 1) ;
+
+OPTI TRAC PSC ;
+OPTI FTRA (CHAI "porosity_" SAMP0  PPS) ;
+REPETER IND NBPAS ;
+F11   = EXCO TAB1.VARIABLES_INTERNES.(&IND) 'F' ;
+DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+TRAC LFMAX F11 MOD0 DEFO1 'TITR' 'Porosity' ;
+FIN IND;
+
+FINSI ;

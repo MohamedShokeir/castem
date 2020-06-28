@@ -1,0 +1,320 @@
+***************************************************************************
+*   Calcul elastoplastique couplée (gurson) sur éprouvette CTJ            *
+*       (cf plan TMA.S 23-74) - Partie 2 : Calcul mécanique               *
+***************************************************************************
+
+* NOM DE FICHIER A RESTITUER :
+OPTI 'REST' 'CT_12_5_B_12_5_CU20_MAIL.sauv';
+REST;
+
+*******************************
+*******************************
+**** MODELE MATERIAU 316LN ****
+*******************************
+*******************************
+
+* LIMITE ELASTIQUE (MPa) :
+SIG0    = 249.;
+
+* MODULE DE YOUNG (MPa) :
+YOUN0   = 210000.;
+
+* COEFF. DE POISSON :
+POISSON = 0.33;
+
+* DEFORMATION :
+LE0 = PROG 0. (SIG0 * 100 / YOUN0);
+LE1 = PROG  1.5 2. 3. 5. 7. 10. 15. 20. 25.
+ 30. 35. 40. 45. 50. 55. 60. 65. 70. 80.  100. 1000.;
+LE  = LE0 ET LE1;
+LE  = LE/100.;
+
+* CONTRAINTES :
+LS0 = PROG 0. SIG0;
+LS1 = PROG 294. 305. 327. 370. 409. 464.
+544. 613. 671. 720. 762. 798. 828. 854. 876. 
+895. 911. 924. 946. 972. 1100.;
+LS  = LS0 ET LS1;
+
+EPSMAX = MAXI LE;
+TRAC0  = 'EVOL' 'MANU' 'DEFO' LE 'SIGM' LS; 
+SI  (EGA GRAPH 'O');
+  'DESS' TRAC0 'TITR' ' Courbe de traction.' ;
+FINSI;
+
+***************************
+***************************
+**** MODELE DE CALCULS ****
+***************************
+***************************
+
+* MATERIAU 1 : ELASTO-PLASTIQUE + ISOTROPE
+MOD1 = 'MODE' (MAIL3D) 'MECANIQUE' 'ELASTIQUE' 'PLASTIQUE' 
+'ISOTROPE'; 
+MAT1 = 'MATE' MOD1 'YOUN' YOUN0 'NU' POISSON
+'TRAC' TRAC0; 
+
+* MATERIAU 2 : ELASTO-PLASTIQUE + ISOTROPE + GTN
+FC0   = 0.000001;
+FF    = 0.3;
+FC    = 0.05;
+FNE0  = 0.0055;
+SIG00 = YOUN0 / SIG0; 
+MOD2  = 'MODE' (MAILF3D) 'MECANIQUE' 'ELASTIQUE' 'ISOTROPE' 
+'PLASTIQUE_ENDOM' 'GURSON2';
+MAT2  = 'MATE' MOD2 'YOUN' YOUN0 'NU' POISSON
+'TRAC' TRAC0 'Q' 1.5 'FU' (1./1.5) 'FF' FF 'FC' FC
+'FNS0' 0.00 'FNE0' FNE0 'SNS' (.1 * SIG00) 'SNE' .1
+'SIGN' (2.2 * SIG00) 'EPSN' 0.2 'F0' FC0;
+
+* MATERIAU 3 : ELASTIQUE
+MOD3 = 'MODE' (GOU3D) 'MECANIQUE' 'ELASTIQUE';
+MAT3 = 'MATE' MOD3 'YOUN' (100 * YOUN0) 'NU' POISSON;
+
+* MATERIAU TOTAL :
+MODTOT = MOD1 ET MOD2 ET MOD3;
+MATTOT = MAT1 ET MAT2 ET MAT3;
+
+***********************************************
+***********************************************
+**** FRACTION DE CAVITES INITIALES EN MAT2 ****
+***********************************************
+***********************************************
+
+Q01  = 'MANU' 'CHML' MODTOT 'VHWF' FC0 'TYPE' 'VARINTER' 'STRESSES';
+Q00  = 'ZERO' MODTOT 'VARINTER';
+QQ00 = Q00 + Q01;
+
+******************************************
+******************************************
+****     CONDITIONS AUX LIMITES       ****
+******************************************
+******************************************
+
+*scote = elem (enveloppe MAILTOT) appui strictement pcote;
+*cl3 = bloq UZ scote;
+
+CL1         = BLOQ UY LIEN;
+CL2         = BLOQ UY CHARGUY;
+CHX CHY CHZ = COOR (ENVE MAILTOT);
+PCOTE       = POIN CHZ INFE (0.00000001);
+CL3         = BLOQ UZ PCOTE;
+CL4         = BLOQ UX UZ PTZ;
+CLTOT       = CL1 ET CL2 ET CL3 ET CL4;
+
+*****************************************
+*****************************************
+**** CHARGEMENTS ET TEMPS DU CALCULS ****
+*****************************************
+*****************************************
+
+DEPMAX  = 10.;
+NCYCLES = 40;
+NPASCCH = 100;
+
+DEPMAX  = 0.1;
+NCYCLES = 1;
+NPASCCH = 10;
+
+* DEPLACEMENTS :
+DELTAY = DEPMAX / NCYCLES;
+LDEP   = PROG (0);
+REPE IND (NCYCLES);
+     LDEP = LDEP ET (PROG (DELTAY * &IND))
+            ET (PROG ((DELTAY * &IND) - (0.04)));
+FIN IND;
+LDEP = LDEP / (MAXI LDEP);
+
+* CHARGEMENTS :
+LTCHARG = PROG (0);
+REPE IND (2 * NCYCLES);
+     LTCHARG = LTCHARG ET (PROG (&IND));
+FIN IND;
+
+* TEMPS SAUVEGARDES :
+LTPS = PROG (0);
+REPE IND (2 * NCYCLES);
+     LTPS = LTPS ET (PROG (&IND));
+FIN IND;
+
+* TEMPS CALCULES :
+*** RMK :
+*    - nombre de subdivision du pas dans les phases de chargement
+*      entre pair et impaire on est sur la charge
+LTPC = PROG;
+REPE INDA (NCYCLES);
+    LTPC = LTPC ET (PROG (2 * (&INDA - 1)));
+	REPE INDB (NPASCCH);
+        LTPC = LTPC ET (PROG (2 * (&INDA - 1) + ((1./NPASCCH)*&INDB)));
+	FIN INDB;
+FIN INDA;
+LTPC = LTPC ET (PROG (2 * NCYCLES));
+
+********************************************
+********************************************
+**** PAS ADAPTIF AVEC LA PROCED. PERSO1 ****
+********************************************
+********************************************
+
+* MODELE REDUIT ET CALC. DU VOL. DES ELEMENTS
+FONC1X = 'MANU' 'CHPO' MAILF3D 1 'SCAL' 1.;
+FONC1  = 'CHAN' 'CHAM' MOD2 FONC1X 'GRAVITE' 'SCALAIRE';
+*** RMK : V_P_FIS est le volume de la couche d'élément dans le plan
+*         de la fissure de la zone endommageable
+V_FIS = 'INTG' MOD2 FONC1;
+
+* DEBUT PROCEDURE :
+DEBPROC PERSO1 TAB1*'TABLE';
+* calcul de la variation de f
+    SI (((TAB1.ESTIMATION.TEMPS) EGA (EXTR LTPC 1)));
+       MCAV1    = FC0;
+       LMCAV1   = PROG;
+       LVARCAV1 = PROG;
+          SINON;
+             LMCAV1   = TAB1 . LMCAV;
+             LVARCAV1 = TAB1 . LVARMCAV;
+             MCAV1    = (EXTR LMCAV1 (DIME LMCAV1));
+    FINSI;
+    CHCAV = TAB1.ESTIMATION.VARIABLES_INTERNES;
+    CHCAV = EXCO CHCAV VHWF;
+    MCAV2 = INTG MOD2 CHCAV;
+    MCAV2 = MCAV2 / V_FIS; 
+    MESS '**** La valeur moyenne     de f est de: '  MCAV2;
+    MESS '**** La valeur precedente  de f est de: '  MCAV1;
+*
+    VARIA = ((MCAV2 - MCAV1) / MCAV1);
+    MESS '**** La variation relative de f est de: '  VARIA;
+    CRITERE = 0.2;
+*   MODIFICATION DES LISTES DE TEMPS SI VARIA>CRITERE :
+    LT  = TAB1 . WTABLE . 'TEMPS_CALCULES';
+    DT0 = ((EXTR LT ((DIME LT) - 1))
+        - (EXTR LT ((DIME LT) - 2)))/2.;
+    NEWLTPS = LT;
+    SI (VARIA > CRITERE);
+       MESS '!! ATTENTION FORTE VARIATION DE f > ' CRITERE;
+       MESS '!! Ajout des pas intermediaires';  
+       NEWLTPS = PROG (EXTR LT 1) PAS DT0 (EXTR LT (DIME LT));  
+*      newltps = ORDO CROI UNIQ newltps; 
+       TAB1 . WTABLE . 'TEMPS_CALCULES' = NEWLTPS;
+       MESS '!! Decoupage dt' dt0;
+    FINSI;
+    LMCAV1   = LMCAV1 ET (PROG MCAV2);
+    LVARCAV1 = LVARCAV1 ET (PROG VARIA);
+    TAB1 . LMCAV = LMCAV1;
+    TAB1 . LVARMCAV = LVARCAV1;
+*   SG1 = TA1.ESTIMATION.CONTRAINTES;
+    CHCAV = EXCO (TAB1.ESTIMATION.VARIABLES_INTERNES) VHWF;   
+    CHCAV = REDU CHCAV MAILF3D;           
+*   SGP1 = PRIN SG1 mod2;
+*   SG11 = CHAN 'GRAVITE' (EXCO 'SI11' SGP1) mod2;
+*   SG11 = EXCO 'SI11' SGP1;
+    NBPG = 8;
+    NELEM = NBEL MAILF3D;
+    CHMFISS = MANU 'CHAM' MOD2 'POSI' GRAVITE SCAL 1 1 0.;
+    NBPGCAST = 0;
+    REPE IND1 NELEM;
+       NPGCASSE = 0.;
+          REPE IND2 NBPG;
+             VAL1 = EXTR CHCAV VHWF 1 (&IND1) (&IND2);
+             COUPURE = 0.99;
+                SI (VAL1 > (COUPURE * FF));
+                   NPGCASSE = NPGCASSE + 1;
+                   NBPGCAST = NBPGCAST + 1;
+                FINSI;
+          FIN IND2;
+          CHFISS1 = MANU 'CHAM' MOD2 'POSI' GRAVITE
+                    scal &IND1 1 NPGCASSE ;
+          CHMFISS = CHMFISS + CHFISS1;
+    FIN IND1;
+    NPGCRIT = 4;
+    MAILREST = CHMFISS ELEM 'EGINFE' (NPGCRIT);
+    MODRED2  = REDU MOD2 MAILREST;        
+    
+    CHX CHY CHZ = COOR (ENVE (MAIL3D ET MAILREST));
+    PBAS = POIN CHY INFE (0.00000001);
+    CHX CHY CHZ = COOR (ENVE PBAS);
+    PBAS = POIN CHX SUPE A;
+    CHX CHY CHZ = COOR (ENVE PBAS);
+    SBAS  = ELEM (ENVE (MAIL3D ET MAILREST)) 
+            APPUI STRICTEMENT PBAS;
+    CL1   = BLOQ UY SBAS;
+    CLTOT = CL1 ET CL2 ET CL3 ET CL4;
+    DA = ((NBEL (DIFF MAILF3D MAILREST)) * C)/ NVOL;
+    MESS 'Nb Elements casses:' (NBEL (DIFF MAILF3D MAILREST));
+    MESS 'NB Pts Gauss casses:' NBPGCAST;
+    MESS 'Avance de fissure:' DA;
+    SI (EGA GRAPH 'O');
+       SI ((NBEL (DIFF MAILF3D MAILREST)) NEG TAB1 . 'TOTECAS');
+          SI (((TAB1.ESTIMATION.TEMPS) NEG (EXTR LTPC 1)));
+             TRAC CHMFISS MOD2;
+             TRAC MAILREST;
+             TRAC SBAS;
+          FINSI;
+       FINSI;
+    FINSI;
+* QUAND SUPRIME RAFFINE UN PEU LE TEMPS :
+    SI ((NBEL (DIFF MAILF3D MAILREST)) NEG TAB1 . 'TOTECAS');
+       NEWLTPS = NEWLTPS ET 
+                 (PROG (TAB1.ESTIMATION.TEMPS)
+                 (TAB1.ESTIMATION.TEMPS + (1*DT0/8))
+                 (TAB1.ESTIMATION.TEMPS + (2*DT0/8))
+                 (TAB1.ESTIMATION.TEMPS + (3*DT0/8))
+                 (TAB1.ESTIMATION.TEMPS + (4*DT0/8)));  
+       NEWLTPS = ORDO CROI UNIQ NEWLTPS;           
+       TAB1 . WTABLE . 'TEMPS_CALCULES' = NEWLTPS;
+    FINSI;
+
+    TAB1 . 'TOTPTCAS' = NBPGCAST; 
+    TAB1 . 'TOTECAS'  = (NBEL (DIFF MAILF3D MAILREST));    
+    TAB1.WTABLE.'MO_TOTAL' = (MODRED2 ET MOD1 ET MOD3);
+    TAB1.WTABLE.'BLOCAGES_MECANIQUES'= CLTOT;
+    MESS '************************* FIN ****************************';
+FINPROC;
+
+DEP1 = 'DEPI' CL2 DEPMAX ; 
+EV0  = 'EVOL' 'MANU' TEMPS LTCHARG y LDEP;
+DESS EV0;
+CHA0 = 'CHAR' 'DIMP' DEP1 EV0;
+
+**************************
+**************************
+******* SAUVEGARDS *******
+**************************
+**************************
+OPTI SAUV 'CT_12_5_B_12_5_IC20_CALC.sauv';
+SAUV TAB1 DEPMAX SIG0 FC0 FF FC FNE0 
+MAIL3D GOU LIEN LBAS CHARGUY MODTOT0 
+MODTOT2 MATTOT0 MATTOT2 W A CL2 
+TFIN DEP1 LEV_SUP1 NGH NGH2 NVOL NENT 
+HAUT B MAILTOT C NCYCLES NPASCCH 
+YOUN0 POISSON LTPS LTPC LTCHARG DELTAY;
+
+**************************
+**************************
+****      PASAPAS     ****
+**************************
+**************************
+TAB1                           = 'TABLE';
+TAB1 . 'PROCEDURE_PERSO1'      = VRAI;
+TAB1 . 'MODELE'                = MODTOT; 
+*!
+TAB1 . 'TEMPS_CALCULES'        = LTPC;
+TAB1 . 'TEMPS_SAUVES'          = LTPS;
+TAB1 . 'TEMPS_SAUVEGARDES'     = LTPS;
+TAB1 . 'CARACTERISTIQUES'      = MATTOT;
+TAB1 . 'BLOCAGES_MECANIQUES'   = CLTOT;
+TAB1 . 'VARIABLES_INTERNES'    = 'TABLE'; 
+TAB1 . 'VARIABLES_INTERNES'. 0 = QQ00; 
+TAB1 . 'CHARGEMENT'            = CHA0;
+TAB1 . 'GRANDS_DEPLACEMENTS'   = VRAI;
+TAB1 . 'LAGRANGIEN'            = MOT 'REACTUALISE';
+TAB1 . 'LMCAV'                 = PROG ;
+TAB1 . 'LVARMCAV'              = PROG ;
+TAB1 . 'WMOIN1'                = TABLE; 
+TAB1 . 'EMOIN1'                = TABLE;
+TAB1 . 'CMOIN1'                = TABLE;
+TAB1 . 'TOTPTCAS'              = 0;
+TAB1 . 'TOTECAS'               = 0;
+
+PASAPAS TAB1; 
+FIN INDBI;
