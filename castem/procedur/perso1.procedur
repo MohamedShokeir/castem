@@ -1,0 +1,215 @@
+***********************************************************
+* Procédure PERSO1
+***********************************************************
+
+$$$$ PERSO1
+
+DEBP PERSO1 TAB1*'TABLE' ;
+
+***********************************************************
+* Sauvegarde Force - déplacement
+***********************************************************
+
+'SI'( ('DIME' TAB1.DEPLACEMENTS) > 1);
+
+TMP1 = 'EXTRAIRE' TAB1.ESTIMATION.DEPLACEMENTS 'UZ' (PHEAD);
+TMP2 = 'EXCO' TAB1.ESTIMATION.REACTIONS 'FZ';
+*ST = V1 'POIN' 'PLAN' (10. 0. 0.) (10. 1. 0.) (10. 0. 1.)
+*0.000001;
+UN = 'MANUEL' CHPO LBAS 1 'SCAL' 1.;
+TMP2 = ABS('XTY' TMP2 UN ('MOTS' 'SCAL') ('MOTS' 'SCAL'));
+*TMP2 = -4.*TMP2;
+TAB1.DEP = TAB1.DEP 'ET' ('PROG' TMP1);
+TAB1.FOR = TAB1.FOR 'ET' ('PROG' TMP2);
+F = EXTR (TAB1.FOR) (DIME (TAB1.FOR)) ;
+
+'OPTION' 'SORTIR' 'force_dep.csv';
+'SORTIR' EXCE TAB1.DEP TAB1.FOR SEPA TABU;
+
+'FINSI';
+
+MO1 = TAB1.WTABLE.'MO_TOT';
+MA1 = TAB1.WTABLE.'MA_TOT';
+MAIL1 = 'EXTRAIRE' MO1 'MAIL';
+
+***********************************************************
+* Elimination des éléments cassés
+***********************************************************
+
+TMP1 = 'EXCO' (TAB1.ESTIMATION.VARIABLES_INTERNES) 'BROK';
+TMP1 = 'CHANGER' GRAVITE MO1 TMP1 'STRESSES';
+TMP1 = TMP1 'MASQUE' 'EGSU' 0.5;
+
+TMP2 = 'EXCO' TAB1.ESTIMATION.CONTRAINTES SMZZ;
+TMP2 = 'CHANGER' GRAVITE MO1 TMP2 'STRESSES';
+TMP2 = TMP2 'MASQUE' INFE 1.;
+
+TMP3 = ('NOMC' TMP1 'SCAL') * ('NOMC' TMP2 'SCAL');
+TMP3 = NOMC TMP3 'SCAL';
+
+TMP4 = EXCO TAB1.ESTIMATION.VARIABLES_INTERNES 'P';
+TMP4 = CHAN GRAVITE MO1 TMP4;
+TMP4 = TMP4 MASQ SUPE 1.;
+TMP4 = NOMC TMP4 'SCAL';
+
+MEBR = (TMP3 + TMP4) 'ELEM' SUPE 0.;
+
+MESO = 'DIFF' MAIL1 MEBR;
+NBRO = 'NBEL' MEBR;
+
+TAB1.'DBRO' = NBRO;
+TAB1.'NBRO' = TAB1.'NBRO' '+' NBRO;
+TAB1.'BROO' = TAB1.'BROO' '+' NBRO;
+
+'SI' (('NBEL' MEBR) > 0);
+
+MO2 = 'REDU' MO1 MESO;
+TAB1.WTABLE.'MO_TOT' = MO2;
+TAB1.WTABLE.'MO_TOTAL' = MO2;
+TAB1.WTABLE.'MOD_MEC' = MO2;
+
+'FINSI';
+
+***********************************************************
+* broken elements on the ligament :
+***********************************************************
+LIGA  = MAIL1 ELEM APPUYE LARGEMENT LBAS ;
+MOLIGA = REDU MO1 LIGA;
+TMP2  = 'EXCO' TAB1.ESTIMATION.VARIABLES_INTERNES 'F';
+MCAV2 = INTG MOLIGA TMP2;
+CHCAV = REDU TAB1.ESTIMATION.VARIABLES_INTERNES LIGA ;
+CHCAV = EXCO CHCAV 'F' ;
+
+SI (((TAB1.ESTIMATION.TEMPS) EGA (EXTR LTPC 1))) ;
+MCAV1    = F00 ;
+LMCAV1   = PROG ;
+LVARCAV1 = PROG ;
+SINON ;
+LMCAV1   = TAB1.LMCAV ;
+LVARCAV1 = TAB1.LVARMCAV ;
+MCAV1    = (EXTR LMCAV1 (DIME LMCAV1)) ;
+FINSI;
+
+FONC1X = 'MANU' 'CHPO' LIGA 1 'SCAL' 1. ;
+FONC1  = 'CHAN' 'CHAM' MOLIGA FONC1X 'GRAVITE' 'SCALAIRE' ;
+V_FIS  = 'INTG' MOLIGA FONC1 ;
+MCAV2  = MCAV2 / V_FIS ;
+VARIA  = ((MCAV2 - MCAV1) / MCAV1) ;
+LMCAV1 = LMCAV1 ET (PROG MCAV2);
+LVARCAV1 = LVARCAV1 ET (PROG VARIA);
+TAB1.LMCAV = LMCAV1;
+TAB1.LVARMCAV = LVARCAV1;
+
+* broken elements on the ligament :
+ NBPG = 4;
+    NELEM    = NBEL LIGA;
+    CHMFISS  = MANU 'CHAM' MOLIGA 'POSI' GRAVITE SCAL 1 1 0.;
+    NBPGCAST = 0;
+    REPE IND1 NELEM;
+       NPGCASSE = 0.;
+          REPE IND2 NBPG;
+             VAL1 = EXTR  CHCAV 'F' 1 (&IND1) (&IND2);
+             COUPURE = 0.9;
+                SI (VAL1 > (COUPURE * FR0));
+                   NPGCASSE = NPGCASSE + 1;
+                   NBPGCAST = NBPGCAST + 1;
+                FINSI;
+          FIN IND2;
+          CHFISS1 = MANU 'CHAM' MOLIGA 'POSI' GRAVITE
+                    SCAL &IND1 1 NPGCASSE ;
+          CHMFISS = CHMFISS + CHFISS1;
+    FIN IND1;
+  NPGCRIT = 2;
+  MAILREST = CHMFISS ELEM 'INFERIEUR' (NPGCRIT);
+
+  TAB1 . 'TOTPTCAS' = NBPGCAST; 
+  TAB1 . 'TOTECAS'  = (NBEL (DIFF MTOT MAILREST)); 
+
+MESS '***********************************************' ;
+MESS '**** Average porosity :           '  MCAV2 ;
+MESS '**** Previous value of porosity : '  MCAV1 ;
+MESS '**** Relative variation of f :    '  VARIA ;
+MESS '**** Broken Gauss points :        ' NBPGCAST;
+MESS '**** Broken elements :            ' NBRO ;
+*                        (NBEL (DIFF LIGA MAILREST));
+MESS '**** Resultant force (N):         ' F ;
+MESS '***********************************************' ;
+
+***********************************************************
+* Sauvegarde VTK
+***********************************************************
+
+'SI'( ('DIME' TAB1.DEPLACEMENTS) > 1);
+
+'SI' (TAB1.'BROO' > 1);
+TAB1.'BROO' = 0;
+SVTK (TAB1.'ESTIMATION') MO1
+  'TEST' TAB1.'IND';
+TAB1.'IND' = TAB1.'IND' '+' 1;
+'FINSI'; 
+
+*MESS TAB1.WTABLE.TEMPS0;
+'SI' ('EXISTE' LTPC (TAB1.WTABLE.TEMPS0) 1.e-6);
+*MESS TAB1.WTABLE.TEMPS0;
+SVTK (TAB1.'ESTIMATION') MO1
+  'TEST' TAB1.'IND';
+TAB1.'IND' = TAB1.'IND' '+' 1;
+'FINSI';
+
+'FINSI';
+
+SI ( ('DIME' TAB1.DEPLACEMENTS) > 1);
+SI ((F < 500.) ET (MCAV2 > (F00*2.))) ;
+
+OPTI SAUV (CHAI SAMP0 SAUV0) ;
+
+SAUV TAB0 TAB1 DEPMAX MOD0 MAT0 LTPC LTPS
+CHA0 VAR0 CL NBPAS NNECK NEXT0 NHEAD NCENT
+PEXT0 PNECK PHEAD PCENT LBAS LHAUT LEXT0 
+LIGA0 EXT0 HEAD MTOT R0 R1 
+YOUN0 RHO0 NU0 PHI F00 FC0 FR0 
+Q1 Q2 AN0 PS0 FN0 SIGS0 
+R0 R1 PHI1 PHI2 L0;
+
+FIN ;
+
+FINSI ;
+FINSI ;
+
+***********************************************************
+* Estimation de l'incrément maximal de porosité locale
+***********************************************************
+
+'SI'( ('DIME' TAB1.DEPLACEMENTS) > 1);
+TMP =  TAB1.'F_PREC';
+TMP = CHAN TMP MOD0 'STRESSES';
+TMP2 = 'EXCO' TAB1.ESTIMATION.VARIABLES_INTERNES 'F';
+TMP2 = CHAN TMP2 MOD0 'STRESSES';
+TMP3 = 'EXCO' TAB1.ESTIMATION.VARIABLES_INTERNES 'BROK';
+TMP3 = CHAN TMP3 MOD0 'STRESSES';
+
+TMP = 'REDU' TMP MESO;
+TMP2 = 'REDU' TMP2 MESO;
+TMP3 = 'REDU' TMP3 MESO;
+
+TMPA = ('NOMC' TMP 'SCAL')*('NOMC' (1 '-' TMP3) 'SCAL');
+TMP2A = ('NOMC' TMP2 'SCAL')*('NOMC' (1 '-' TMP3) 'SCAL');
+
+FP = 'MAXIMUM' TMPA;
+FA = 'MAXIMUM' TMP2A;
+DF = 'ABS'(FA '-' FP);
+
+TAB1.'F_PREC' = TMP2;
+'SINON';
+DF = 0;
+'FINSI';
+
+*'MESSAGE' TAB1.'NBRO';
+*'MESSAGE' DF;
+
+TAB1.WTABLE.'DF' = DF;
+TAB1.WTABLE.'DFMAX' = TAB1.'DFMAX';
+
+'FINPROC';
+
+$$$$

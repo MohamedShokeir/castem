@@ -1,9 +1,11 @@
+*OPTI 'ECHO' 0;
+*OPTI 'ERRE' 'FATAL';
 *OPTI 'ERRE' 'IGNORE' ;
 *-----------------------*
 *   Sample definition   *
 *-----------------------*
 
-GTN   = 0 ;
+GTN   = 1 ;
 SAMP0 = 'ST';
 PPS   = '.ps' ;
 SAUV0 = '.sauv' ;
@@ -142,6 +144,8 @@ TAFMIN = TABLE ;
 *        Ligament       *
 *-----------------------*
 
+* ligament : 
+
 ELFIS  = MTOT ELEM APPUYE LARGEMENT LBAS ;
 TRAC ((ENVELOPPE MTOT COUL BLEU) ET (ELFIS COUL ROUGE)) ;
 
@@ -153,11 +157,37 @@ DETR FONC1X ;
 VOL1   = 'INTG' MODFIS FONC1 ;
 FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
 
+* element at the center :
+
+*ELCENT = MTOT ELEM APPUYE LARGEMENT PCENT ;
+*TRAC ((ENVELOPPE MTOT COUL BLEU) ET (ELCENT COUL ROUGE)) ;
+*MODFIS = REDU MOD0 ELCENT ;
+*FONC1X = 'MANU' 'CHPO' ELCENT 1  'SCAL' 1. ;                               
+*FONC1  = 'CHAN' 'CHAM' MODFIS FONC1X 'GRAVITE' 'SCALAIRE' ;              
+*DETR FONC1X ;
+
+*VOL1   = 'INTG' MODFIS FONC1 ;
+*FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
+
+
 *-------------------------*
 * Loop on time increments *
 *-------------------------*
 
 REPETER IND TAILLE ;
+
+* ligament wo broken elements:
+*-----------------------------
+
+  SI (GTN EGA 1) ;  
+   ELFIS  = MESO ELEM APPUYE LARGEMENT LBAS ;
+   MODFIS = REDU MOD0 ELFIS ;
+   FONC1X = 'MANU' 'CHPO' ELFIS 1  'SCAL' 1. ;         
+   FONC1  = 'CHAN' 'CHAM' MODFIS FONC1X 'GRAVITE' 'SCALAIRE' ;  
+   DETR FONC1X ;
+   VOL1   = 'INTG' MODFIS FONC1 ;
+   FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
+  FINSI ;   
 
 * Resultant force and diametral contraction :
 *--------------------------------------------
@@ -210,10 +240,11 @@ REPETER IND TAILLE ;
 
 * stress triaxiality :
 *---------------------
+
    VMIS3             = CHAN TYPE VMIS1 SCALAIRE ;
    CHEL1 CHEL2 CHEL3 = INVA MOD0 TAB1.CONTRAINTES.&IND ;
-*   TRI0              = (CHEL1 / 3.) * (VMIS3 ** -1.) ;
    TRI0              = (CHEL1 / 3.) * ((VMIS3+1.E-10)** -1.) ;
+*   TRI0              = (CHEL1 / 3.) * (VMIS3 ** -1.) ;
    TRI1              = CHAN 'NOEUD' MOD0 TRI0 ;
    TRI2              = CHAN 'CHPO' MOD0 TRI1 ;
    EVTRIAX           = EVOL CHPO TRI2 LBAS ;
@@ -234,14 +265,12 @@ SI (GTN EGA 1) ;
    FCAV2       = CHAN 'CHPO' MOD0 FCAV1 ;
    EVCAV       = EVOL CHPO FCAV2 LBAS ;
    TAF.&IND    = EXTR EVCAV ORDO ;
-   TAFMAX.&IND = MAXI (TAF.&IND) ;
+   TAFMAX.&IND = MAXI TAF.&IND ;
    LFMAX       = LFMAX ET (PROG TAFMAX.&IND) ;
-   TAFMIN.&IND = MINI (TAF.&IND) ;
+   TAFMIN.&IND = MINI TAF.&IND ;
    LFMIN       = LFMIN ET (PROG TAFMIN.&IND) ;
    CHCAV       = REDU FCAV1 ELFIS ;
    MOYCAV      = (INTG MODFIS CHCAV) / VOL1 ;
-*   MAXCAV      = MAXI CHCAV ;
-*   LFMAX       = LFMAX ET (PROG MAXCAV) ;
    LF          = LF ET (PROG MOYCAV) ;
 
 FINSI ;
@@ -343,7 +372,7 @@ OPTI TRAC PSC ;
 OPTI FTRA (CHAI "p_" SAMP0  PPS) ;
 REPETER IND NBPAS ;
 P11   = EXCO TAB1.VARIABLES_INTERNES.(&IND) 'P' ;
-DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND 1.;
 TRAC LPMAX P11 MOD0 DEFO1 'TITR' 'Plastic deformation' ;
 FIN IND;
 
@@ -357,7 +386,7 @@ CH1 CH2 CH3 = INVA MOD0 TAB1.CONTRAINTES.(&IND) ;
 *TRI00       = (CH1 / 3.) * (VMIS22 ** -1.) ;
 TRI00       = (CH1 / 3.) * ((VMIS22+1.E-10)** -1.) ;
 TRI11       = CHAN 'NOEUD' MOD0 TRI00 ;
-DEFO1       = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+DEFO1       = DEFO MTOT TAB1.DEPLACEMENTS.&IND 1.;
 TRAC TRI11 MOD0 DEFO1 'TITR' 'Stress triaxiality' ;
 FIN IND;
 
@@ -366,7 +395,7 @@ OPTI FTRA (CHAI "VMIS_" SAMP0  PPS) ;
 REPETER IND NBPAS ;
 VMIS00 = VMIS MOD0 TAB1.CONTRAINTES.(&IND) ;
 VMIS11 = CHAN 'GRAVITE' MOD0 VMIS00 ;
-DEFO1  = DEFO MTOT TAB1.DEPLACEMENTS.&IND;
+DEFO1  = DEFO MTOT TAB1.DEPLACEMENTS.&IND 1.;
 TRAC LSIGMAX VMIS11 MOD0 DEFO1 'TITR' 'VMIS' ;
 FIN IND;
 
@@ -402,8 +431,10 @@ OPTI TRAC PSC ;
 OPTI FTRA (CHAI "porosity_" SAMP0  PPS) ;
 REPETER IND NBPAS ;
 F11   = EXCO TAB1.VARIABLES_INTERNES.(&IND) 'F' ;
-DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND 1.;
 TRAC LFMAX F11 MOD0 DEFO1 'TITR' 'Porosity' ;
 FIN IND;
 
 FINSI ;
+
+FIN ;

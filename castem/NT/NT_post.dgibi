@@ -1,41 +1,12 @@
-OPTI 'ECHO' 1;
+*OPTI 'ECHO' 0;
 *OPTI 'ERRE' 'FATAL';
 *OPTI 'ERRE' 'IGNORE' ;
 *-----------------------*
 *   Sample definition   *
 *-----------------------*
-'OPTI' 'ACQU' 'data_calcul.dgibi';
 
-* NT10, NT4, or NT2 :
-'ACQU' MM0*'MOT';
-'ACQU' val0*'ENTIER';
-R0 = val0;
-'MESS' ' R0  = ' (R0) ;
-
-* real notch radius of the NT :
-'ACQU' MM0*'MOT';
-'ACQU' val0*'FLOTTANT';
-R1 = val0;
-'MESS' ' R1  = ' (R1) ;
-
-* Damage :
-'ACQU' MM0*'MOT';
-'ACQU' val0*'ENTIER';
-GTN = val0;
-'MESS' ' Damage  = ' (GTN) ;
-
-* lineair or quadraitque :
-'ACQU' MM0*'MOT';
-'ACQU' val0*'ENTIER';
-LINEAR = val0;
-'MESS' ' element type  = ' (LINEAR);
-
-* Thermal fluence
-'ACQU' MM0*'MOT';
-'ACQU' val0*'FLOTTANT';
-PHI  = val0;
-'MESS' ' Thermal fluence  = ' (PHI) ;
- 
+R0 = 10;
+GTN = 1;
 SAMP0 = CHAI 'NT' R0;
 PPS   = '.ps' ;
 SAUV0 = '.sauv' ;
@@ -189,15 +160,15 @@ FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
 
 * element at the center :
 
-ELCENT = MTOT ELEM APPUYE LARGEMENT PCENT ;
-TRAC ((ENVELOPPE MTOT COUL BLEU) ET (ELCENT COUL ROUGE)) ;
-MODFIS = REDU MOD0 ELCENT ;
-FONC1X = 'MANU' 'CHPO' ELCENT 1  'SCAL' 1. ;                               
-FONC1  = 'CHAN' 'CHAM' MODFIS FONC1X 'GRAVITE' 'SCALAIRE' ;              
-DETR FONC1X ;
+*ELCENT = MTOT ELEM APPUYE LARGEMENT PCENT ;
+*TRAC ((ENVELOPPE MTOT COUL BLEU) ET (ELCENT COUL ROUGE)) ;
+*MODFIS = REDU MOD0 ELCENT ;
+*FONC1X = 'MANU' 'CHPO' ELCENT 1  'SCAL' 1. ;                               
+*FONC1  = 'CHAN' 'CHAM' MODFIS FONC1X 'GRAVITE' 'SCALAIRE' ;              
+*DETR FONC1X ;
 
-VOL1   = 'INTG' MODFIS FONC1 ;
-FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
+*VOL1   = 'INTG' MODFIS FONC1 ;
+*FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
 
 
 *-------------------------*
@@ -205,6 +176,19 @@ FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
 *-------------------------*
 
 REPETER IND TAILLE ;
+
+* ligament wo broken elements:
+*-----------------------------
+
+  SI (GTN EGA 1) ;
+   ELFIS  = MESO ELEM APPUYE LARGEMENT LBAS ;
+   MODFIS = REDU MOD0 ELFIS ;
+   FONC1X = 'MANU' 'CHPO' ELFIS 1  'SCAL' 1. ;         
+   FONC1  = 'CHAN' 'CHAM' MODFIS FONC1X 'GRAVITE' 'SCALAIRE' ;  
+   DETR FONC1X ;
+   VOL1   = 'INTG' MODFIS FONC1 ;
+   FVOLU  = ('INTG' 'ELEM' MODFIS FONC1)**-1 ;
+  FINSI ;
 
 * Resultant force and diametral contraction :
 *--------------------------------------------
@@ -389,7 +373,7 @@ OPTI TRAC PSC ;
 OPTI FTRA (CHAI "p_" SAMP0  PPS) ;
 REPETER IND NBPAS ;
 P11   = EXCO TAB1.VARIABLES_INTERNES.(&IND) 'P' ;
-DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND 1.;
 TRAC LPMAX P11 MOD0 DEFO1 'TITR' 'Plastic deformation' ;
 FIN IND;
 
@@ -403,7 +387,7 @@ CH1 CH2 CH3 = INVA MOD0 TAB1.CONTRAINTES.(&IND) ;
 *TRI00       = (CH1 / 3.) * (VMIS22 ** -1.) ;
 TRI00       = (CH1 / 3.) * ((VMIS22+1.E-10)** -1.) ;
 TRI11       = CHAN 'NOEUD' MOD0 TRI00 ;
-DEFO1       = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+DEFO1       = DEFO MTOT TAB1.DEPLACEMENTS.&IND 1.;
 TRAC TRI11 MOD0 DEFO1 'TITR' 'Stress triaxiality' ;
 FINSI ;
 FIN IND;
@@ -413,7 +397,7 @@ OPTI FTRA (CHAI "VMIS_" SAMP0  PPS) ;
 REPETER IND NBPAS ;
 VMIS00 = VMIS MOD0 TAB1.CONTRAINTES.(&IND) ;
 VMIS11 = CHAN 'GRAVITE' MOD0 VMIS00 ;
-DEFO1  = DEFO MTOT TAB1.DEPLACEMENTS.&IND;
+DEFO1  = DEFO MTOT TAB1.DEPLACEMENTS.&IND 1.;
 TRAC LSIGMAX VMIS11 MOD0 DEFO1 'TITR' 'VMIS' ;
 FIN IND;
 
@@ -449,7 +433,7 @@ OPTI TRAC PSC ;
 OPTI FTRA (CHAI "porosity_" SAMP0  PPS) ;
 REPETER IND NBPAS ;
 F11   = EXCO TAB1.VARIABLES_INTERNES.(&IND) 'F' ;
-DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND ;
+DEFO1 = DEFO MTOT TAB1.DEPLACEMENTS.&IND 1.;
 TRAC LFMAX F11 MOD0 DEFO1 'TITR' 'Porosity' ;
 FIN IND;
 

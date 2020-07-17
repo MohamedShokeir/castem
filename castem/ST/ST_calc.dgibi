@@ -1,128 +1,3 @@
-
-*-----------------------*
-*   Paraview Procedure  *
-*-----------------------*
-
-'DEBPROC' SVTK TABNL*TABLE OBJMO*MMODEL FICH*MOT RMAIL/MAILLAGE;
-
-MAILL = 'EXTRAIRE' OBJMO 'MAIL';
-UN = 'MANUEL' CHML OBJMO SCAL 1. 'GRAVITE';
-FVOLU = (('INTG' 'ELEM' UN OBJMO)'**'(-1));
-
-I = 0;
-'REPETER' BO1 ('DIME' TABNL.DEPLACEMENTS);
-VM = VMIS TABNL.CONTRAINTES.I OBJMO;
-VM = 'NOMC' 'VMIS' VM;
-CHAT = ('REDU' OBJMO TABNL.CONTRAINTES.I) 'ET'
- ('REDU' OBJMO TABNL.VARIABLES_INTERNES.I)
-  'ET' ('REDU' OBJMO VM);
-
-TABV = TABLE;
-LCOM = 'EXTRAIRE' CHAT 'COMP';
-
-'REPETER' BO2 ('DIME' LCOM);
-TMP1 = 'INTG' 'ELEM' OBJMO
- CHAT ('EXTRAIRE' &BO2 LCOM);
-TMP2 = 'CHANGER' TMP1 OBJMO 'GRAVITE';
-TMP3 = 'NOMC' (TMP2*FVOLU) ('EXTRAIRE' &BO2 LCOM);
-TABV.('EXTRAIRE' &BO2 LCOM) = TMP3;
-'FIN' BO2;
-
-'OPTION' 'SORTIR' FICH;
-'SORTIR' VTK MAILL 'MAIL' (TABNL.DEPLACEMENTS.I) 'DEPL'
- TABV 'FORM' 'AUTO' 'TEMP' I 'DOUBLE_PRECISION';
-
-'SI' ('EXISTE' RMAIL);
-GCHA1 = 'REDU' CHAT RMAIL;
-GCHA2 = 'REDU' (TABNL.DEPLACEMENTS.I) RMAIL;
-GMODL = 'REDU' OBJMO RMAIL; 
-
-G1 G2 G3 = GVTK GCHA1 GCHA2 GMODL;
-
-'OPTION' 'SORTIR' ('CHAINE' FICH '_POINTS_DE_GAUSS');
-'SORTIR' VTK G1 'GAUS' G2 'DEPL'
- G3 'BINA' 'AUTO' 'TEMP' I 'DOUBLE_PRECISION';
-'FINSI';
-
-I = I '+' 1;
-
-'FIN' BO1;
-
-'FINPROC';
-
-'DEBPROC' GVTK CHAM0*MCHAML CHPO0*CHPOINT OBJMO*MMODEL;
-
-MAILL = 'EXTRAIRE' OBJMO 'MAIL';
-
-***************************************************
-
-CHA1 = 'CHANGER' CHAM ('COORDONNEE' 1 MAILL) OBJMO 'STRESSES';
-CHA1 = 'NOMC' 'X' CHA1;
-CHA2 = 'CHANGER' CHAM ('COORDONNEE' 2 MAILL) OBJMO 'STRESSES';
-CHA2 = 'NOMC' 'Z' CHA2;
-CHAP = CHA1 'ET' CHA2;
-
-CHAD = ('CHANGER' CHAM OBJMO CHPO0 'STRESSES');
-CHAD = 'EXCO' ('MOTS' 'UX' 'UZ') CHAD;
-
-CHAM1 = CHAP 'ET' CHAD 'ET' CHAM0;
-LCOM = 'EXTRAIRE' CHAM1 'COMP';
-
-TABR = TABLE;
-'REPETER' BO1 ('DIME' LCOM);
-TABR.&BO1 = 'PROG';
-'FIN' BO1;
-
-***************************************************
-
-MOZO = 'EXTRAIRE' OBJMO 'ZONE';
-
-'OPTION' ERREUR 'CONTROLE';
-J = 1;
-'REPETER' BO0 (('DIME' MOZO)/2);
-TMPMODEL = MOZO.J;
-TMPMAILL = MOZO.(J '+' 1);
-'REPETER' BO1 ('NBEL' TMPMAILL);
-CHAM2 = 'REDU' CHAM1 ('ELEM' &BO1 TMPMAILL);
-'REPETER' BO2 100;
-TEST = 'EXTRAIRE' CHAM2 ('EXTRAIRE' LCOM 1) 1 1 &BO2;
-'SI' (('EXISTE' TEST));
-'REPETER' BO3 ('DIME' LCOM);
-TMP1 = 'EXTRAIRE' CHAM2
- ('EXTRAIRE' LCOM &BO3) 1 1 &BO2;
-TABR.&BO3 = (TABR.&BO3) 'ET' ('PROG' TMP1);
-'FIN' BO3;
-'SINON';
-'QUITTER' BO2;
-'FINSI';
-'FIN' BO2;
-'FIN' BO1;
-J = J '+' 2;
-'FIN' BO0;
-'OPTION' ERREUR 'NORMALE';
-
-'REPETER' BO1 ('DIME' (TABR.1));
-TMP1 = 'EXTRAIRE' &BO1 (TABR.1);
-TMP2 = 'EXTRAIRE' &BO1 (TABR.2);
-'SI' (&BO1 'EGA' 1);
-PTGAUSS = TMP1 TMP2;
-'SINON';
-PTGAUSS = PTGAUSS 'ET' (TMP1 TMP2);
-'FINSI';
-'FIN' BO1;
-
-DEPGAUSS = 'MANUEL' 'CHPO' PTGAUSS
- 'UX' (TABR.3) 'UZ' (TABR.4);
-
-TABV = TABLE;
-'REPETER' BO1 (('DIME' LCOM) '-' 4);
-TMP1 = 'MANUEL' 'CHPO'  'NATU' 'DISCRET'
- PTGAUSS ('EXTRAIRE' (&BO1 '+' 4) LCOM) (TABR.(&BO1+4));
-TABV.('EXTRAIRE' (&BO1 '+' 4) LCOM) = TMP1;
-'FIN' BO1;
-
-'FINPROC' PTGAUSS DEPGAUSS TABV;
-
 *-----------------------*
 *   Sample definition   *
 *-----------------------*
@@ -147,7 +22,7 @@ SAUV0 = '.sauv' ;
 PHI1  = 2. ;
 * Total deformation/deplacement :
 L0     = 9.;
-DEFMAX = 0.2 ;
+DEFMAX = 0.3 ;
 DEPMAX = L0 * DEFMAX ;
 
 *-----------------------*
@@ -163,14 +38,7 @@ PHI   = 0;
 
 * GTN :
 F00   = 0.0043 ;
-FC0   = 0.02 ;
-FR0   = 0.03 ;
-Q10   = 2. ;
-Q20   = 1. ;
-AN0   = 2.92 ;
-PS0   = 0.0321 ;
-FN0   = 0.0215 ;
-SIGS0 = 500. ;
+FR0   = 0.056 ;
 
 *-----------------------*
 *         Mesh          *
@@ -202,6 +70,7 @@ HEAD  = CHAN ELEM0 (TAB0 . 'head') ;
 
 ELIM ((MTOT) ET (LBAS ET LHAUT ET PNECK ET NNECK)) 10.E-6;
 TRAC (MTOT ET (LBAS COUL VERT ET LHAUT COUL ROUGE));
+
 *-----------------------*
 *        Model          *
 *-----------------------*
@@ -232,19 +101,6 @@ MOD0 = 'MODELISER' MTOT 'MECANIQUE' 'ELASTIQUE' 'NON_LINEAIRE'
  'C_MATERIAU' COE1 'C_VARINTER' STATEV ;
 MAT0 = 'MATERIAU' MOD0 'YOUN' YOUN0 'NU' 0.3 'RHO' 0 'PHI' PHI;
 
-*COE1 = 'MOTS' 'YOUN' 'NU' 'RHO' 'PHI' 'FFN' 'FFC' 'FFR' 'Q1' 'Q2' 
-*'AN0' 'PPS' 'SSIGS' ;
-*STATEV = 'MOTS' 'EERR' 'EEZZ' 'EETT' 'EERZ' 'P' 'F' 
-*'SSTA' 'FSTA' 'FN' 'FG' 'BROK' 'NITE' 'SIGI' 'DFRA' ;
-*MOD0 = 'MODELISER' MTOT 'MECANIQUE' 'ELASTIQUE' 'NON_LINEAIRE'
-*'UTILISATEUR' ELEM2 
-* 'LIB_LOI' 'src/libUmatBehaviour.so' 
-*'FCT_LOI' 'umatgtn_malls'
-* 'C_MATERIAU' COE1 'C_VARINTER' STATEV ;
-*MAT0 = 'MATERIAU' MOD0 'YOUN' YOUN0 'NU' 0.3 'RHO' 0 'PHI' PHI 
-*'FFN' FN0 'FFC' FC0 'FFR' FR0 'Q1' Q10 'Q2' Q20 'AN0' AN0 'PPS' PS0
-*'SSIGS' SIGS0 ;
-
 FINSI ;
 
 *-----------------------*
@@ -261,15 +117,9 @@ TFIN0 = 1. ;
 SI (GTN EGA 0);
 VAR0 = MANU CHML MOD0 'EERR' 0. 'EEZZ' 0. 'EETT' 0.
 'EERZ' 0. 'P' 0. ;
-*VAR0 = MANU CHML MOD0 'EPSE' 0. ;
 SINON ;
-
 VAR0 = MANU CHML MOD0 'EERR' 0. 'EEZZ' 0. 'EETT' 0. 
 'EERZ' 0. 'P' 0. 'F' F00 'FG' 0. 'BROK' 0. ;
-*VAR0 = MANU CHML MOD0 'EERR' 0. 'EEZZ' 0. 'EETT' 0. 
-*'EERZ' 0. 'P' 0. 'F' F00 'SSTA' 0. 'FSTA' 0.
-*'FN' 0. 'FG' 0. 'BROK' 0. 
-*'NITE' 0. 'SIGI' 0. 'DFRA' 0.;
 FINSI;
 
 DEP1 = 'DEPI' CL2 DEPMAX ; 
@@ -282,125 +132,12 @@ LTPS = (PROG 0. PAS 1.E-2 1.) ;
 NBPAS = DIME (LTPS) - 1. ;
 
 *-----------------------*
-*       PERSO 1         *
-*-----------------------*
-DEBP PERSO1 TAB1*'TABLE' ;
-ELBAS  = MTOT ELEM APPUYE LARGEMENT LBAS ;
-
-* Variation of f :
-*-----------------
-SI (((TAB1.ESTIMATION.TEMPS) EGA (EXTR LTPC 1))) ;
-MCAV1    = F00 ;
-LMCAV1   = PROG ;
-LVARCAV1 = PROG ;
-SINON ;
-LMCAV1   = TAB1 . LMCAV ;
-LVARCAV1 = TAB1 . LVARMCAV ;
-MCAV1    = (EXTR LMCAV1 (DIME LMCAV1)) ;
-FINSI;
-
-CHCAV = TAB1.ESTIMATION.VARIABLES_INTERNES ;
-CHCAV = REDU CHCAV ELBAS ;
-CHCAV = EXCO CHCAV 'F' ;
-MORED = REDU MOD0 ELBAS ;
-MCAV2 = INTG MORED CHCAV ;
-*broken criteria
-CHBROK =  TAB1.ESTIMATION.VARIABLES_INTERNES ;
-CHBROK = REDU CHBROK ELBAS ;
-CHBROK = EXCO CHBROK 'BROK' ;
-
-FONC1X = 'MANU' 'CHPO' ELBAS 1 'SCAL' 1. ;
-FONC1  = 'CHAN' 'CHAM' MORED FONC1X 'GRAVITE' 'SCALAIRE' ;
-V_FIS  = 'INTG' MORED FONC1 ;
-MCAV2  = MCAV2 / V_FIS ;
-VARIA  = ((MCAV2 - MCAV1) / MCAV1) ;
-LMCAV1          = LMCAV1 ET (PROG MCAV2);
-LVARCAV1        = LVARCAV1 ET (PROG VARIA);
-TAB1 . LMCAV    = LMCAV1;
-TAB1 . LVARMCAV = LVARCAV1;
-
-EVF  = EVOL CHPO (TAB1.ESTIMATION.REACTIONS) LBAS ;
-F    = ABS(SOMM (EXTR EVF 'ORDO')) ;
-
-* broken elements on the ligament :
- NBPG = 4;
-    NELEM    = NBEL ELBAS;
-    CHMFISS  = MANU 'CHAM' MORED 'POSI' GRAVITE SCAL 1 1 0.;
-    NBPGCAST = 0;
-    REPE IND1 NELEM;
-       NPGCASSE = 0.;
-          REPE IND2 NBPG;
-*             VAL1 = EXTR CHBROK 'BROK' 1 (&IND1) (&IND2);
-             VAL1 = EXTR CHCAV 'F' 1 (&IND1) (&IND2);
-             COUPURE = 0.99;
-                SI (VAL1 > (COUPURE * FR0));
-*                SI (VAL1 EGA 1);
-                   NPGCASSE = NPGCASSE + 1;
-                   NBPGCAST = NBPGCAST + 1;
-                FINSI;
-          FIN IND2;
-          CHFISS1 = MANU 'CHAM' MORED 'POSI' GRAVITE
-                    SCAL &IND1 1 NPGCASSE ;
-          CHMFISS = CHMFISS + CHFISS1;
-    FIN IND1;
-  NPGCRIT = 2;
-  MAILREST = CHMFISS ELEM 'INFERIEUR' (NPGCRIT);
-  MODRED2  = REDU MOD0 MAILREST; 
-  CHR CHZ = COOR (ENVE MAILREST);
-  PBAS = POIN CHZ INFE (0.00000001);
-  CHR CHZ = COOR (ENVE PBAS);
-  LLBAS  = ELEM (ENVE (MAILREST)) APPUI LARGEMENT PBAS;
-  LLBAS1 = CHAN 'LIGNE' LLBAS;
-  LLBAS2 = ELEM LLBAS1 APPUI STRICTEMENT PBAS;
-*  CL1 = BLOQ UZ LLBAS2;
-*  CL = CL1 ET CL2;
-
-*  TAB1 . 'TOTPTCAS' = NBPGCAST; 
-*  TAB1 . 'TOTECAS'  = (NBEL (DIFF MTOT MAILREST)); 
-*  TAB1.WTABLE.'MO_TOTAL' = MODRED2        ;
-*  TAB1.WTABLE.'BLOCAGES_MECANIQUES'= CL;
-
-MESS '***********************************************' ;
-MESS '**** Average porosity :           '  MCAV2 ;
-MESS '**** Previous value of porosity : '  MCAV1 ;
-MESS '**** Relative variation of f :    '  VARIA ;
-MESS '**** Broken Gauss points :        ' NBPGCAST;
-MESS '**** Broken elements :            ' 
-(NBEL (DIFF ELBAS MAILREST));
-MESS '**** Resultant force:             ' F ;
-MESS '***********************************************' ;
-
-'SI' (TAB1 .'REDUCTION') ;
-*---> Reduction du pas de temps
-PR_RED TAB1 ;
-*---> Evolution a chaque pas de calcul
-*PR_EVO1 TAB1 ;
-DFRA = EXCO (TAB1.ESTIMATION.VARIABLES_INTERNES) 'DFRA';
-MESS 'DFRA : ' (MAXI DFRA) (MINI DFRA);
-'FINSI' ; 
-
-OPTI SAUV (CHAI SAMP0 SAUV0) ;
-
-SAUV TAB0 TAB1 DEPMAX MOD0 MAT0 LTPC LTPS
-CHA0 VAR0 CL NBPAS NNECK NEXT0 NHEAD NCENT
-PEXT0 PNECK PHEAD PCENT LBAS LHAUT LEXT0 
-LIGA0 EXT0 HEAD MTOT PHI1  
-YOUN0 RHO0 NU0 PHI F00 FC0 FR0 
-Q1 Q2 AN0 PS0 FN0 SIGS0 L0;
-
-SI ((ABS F < 500.) ET (MCAV2 > (F00*2.))) ;
-SVTK TAB1 MOD0 SAMP0 MTOT;
-FIN ;
-FINSI ;
-
-FINP;
-
-*-----------------------*
 *      PAS A PAS        *
 *-----------------------*
 
 TAB1                       = TABLE;
 TAB1.'VARIABLES_INTERNES'  = TABLE ;
+TAB1.VARIABLES_INTERNES.0  = VAR0 ;
 TAB1.'MOVA'                = 'MOT' 'RIEN' ;
 TAB1.'BLOCAGES_MECANIQUES' = CL ;
 TAB1.'MODELE'              = MOD0 ;
@@ -409,33 +146,35 @@ TAB1.'CHARGEMENT'          = CHA0 ;
 TAB1.'TEMPS_CALCULES'      = LTPC ;
 *TAB1.'TEMPS_SAUVEGARDES'   = LTPS ; si pas_resu
 TAB1.'TEMPS_SAUVES'        = LTPS ;
-TAB1.VARIABLES_INTERNES.0  = VAR0 ;
+*
+TAB1.'PAS_AJUSTE'          = VRAI ;
+TAB1.'DFMAX'               = 1.e-3;
+TAB1.'FMAX_P'              = 0.;
+TAB1.'FMAX_N'              = 0.;
+TAB1.'F_PREC'              = MANU CHML MOD0 'SCAL' F00;
+TAB1.'NBRO'                = 0 ;
+TAB1.'BROO'                = 0 ;
+TAB1.'DEP'                 = 0 ;
+TAB1.'FOR'                 = 0 ;
+TAB1.'IND'                 = 0 ;
+*
+
 TAB1.'GRANDS_DEPLACEMENTS' = VRAI ;
-*TAB1.'GRANDES_DEFORMATIONS' = VRAI;
 TAB1.'LAGRANGIEN'           = 'MOT' 'REACTUALISE';
 TAB1.'CONVERGENCE_FORCEE'   = VRAI ;
 *
 SI (GTN EGA 1) ;
 TAB1 .'PROCEDURE_PERSO1' = VRAI ;
-TAB1 .'LMCAV'            = PROG ;
-TAB1 .'LVARMCAV'         = PROG ;
-TAB1 .'TOTPTCAS'         = PROG ; 
-TAB1 .'TOTECAS'          = PROG ;
+TAB1 .'LMCAV'            = 0. ;
+TAB1 .'LVARMCAV'         = 0. ;
+TAB1 .'TOTPTCAS'         = 0. ; 
+TAB1 .'TOTECAS'          = 0. ;
 FINSI ;
 * 
-*TMASAU                     = 'TABLE' ;
-*TAB1   . 'MES_SAUVEGARDES' = TMASAU ;
-*TMASAU .'DEFTO'            = VRAI ;
-*TMASAU .'DEFIN'            = VRAI ;  
-*
-TAB1 .'REDUCTION' =  FAUX ; 
-TAB1 .'DTMIN'     = 1.E-10 ; 
-*TAB1 .'DEMAX'     = 1.E-3 ; 
-TAB1 .'DDMAX'     = FR0/1000. ;
-
+  
 PASAPAS TAB1 ;
 
-SVTK TAB1 MOD0 SAMP0 MTOT;
+*SVTK TAB1 MOD0 SAMP0 MTOT;
 
 *-----------------------*
 *         Save          *
@@ -446,8 +185,7 @@ OPTI SAUV (CHAI SAMP0 SAUV0) ;
 SAUV TAB0 TAB1 DEPMAX MOD0 MAT0 LTPC LTPS
 CHA0 VAR0 CL NBPAS NNECK NEXT0 NHEAD NCENT
 PEXT0 PNECK PHEAD PCENT LBAS LHAUT LEXT0 
-LIGA0 EXT0 HEAD MTOT PHI1  
-YOUN0 RHO0 NU0 PHI F00 FC0 FR0 
-Q1 Q2 AN0 PS0 FN0 SIGS0 L0;
+LIGA0 EXT0 HEAD MTOT R0 R1 YOUN0 RHO0 NU0 
+PHI F00 FR0 PHI1 PHI2 L0;
 
 *OPTI DONN 5;
